@@ -1,317 +1,374 @@
-<!--
-  src/features/rnd/views/Produksi.vue
-  ====================================
-  Sesi produksi. Menjawab: "apa yang sedang jalan di tangki, apa yang
-  antre, dan apa yang sudah keluar bulan ini."
-
-  Aksi satu-satunya di sini: CATAT PACKAGING pada sesi BERJALAN — menutup
-  sesi, mengosongkan tangki, dan mendebit bahan (saldo + fisik tangki) di
-  gudang. Membuat/menjadwalkan sesi belum ada karena service backend-nya
-  belum ada; jangan ditambah sebelum kontraknya jelas.
-
-  Catatan sesi tampil menonjol kalau ada — itu tempat info operasional
-  seperti "menunggu Asam Sitrat, stok rak habis".
--->
 <template>
-    <div>
-        <header class="kepala">
+    <div class="max-w-6xl mx-auto pb-12 animate-fade-in">
+        <!-- Area Header -->
+        <header class="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
             <div>
-                <p class="remah">
-                    <router-link to="/">Dashboard</router-link> › Produksi
+                <div class="flex items-center gap-2 mb-2">
+                    <span
+                        class="bg-indigo-50 text-indigo-600 font-bold text-[10px] tracking-wider uppercase px-2 py-1 rounded-md">
+                        RnD / Work In Progress
+                    </span>
+                </div>
+                <h1 class="text-2xl md:text-3xl font-bold text-slate-800 m-0">Produksi & Pemakaian Bahan</h1>
+                <p class="text-sm text-slate-500 mt-1">
+                    Catat pemakaian fisik bahan (Joint-Pool) dan tujuan tangki penampungan.
                 </p>
-                <h1 class="judul">Sesi produksi</h1>
-                <p class="sub">Yang berjalan di tangki, yang antre, dan hasilnya.</p>
             </div>
+
+            <button
+                class="bg-white border border-slate-200 hover:bg-slate-50 active:scale-95 text-slate-700 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-sm flex items-center gap-2 w-fit">
+                <i class="pi pi-list"></i> Riwayat Produksi
+            </button>
         </header>
 
-        <section class="metrik">
-            <StatCard label="Sedang berjalan" :nilai="berjalan.length" kaki="Di dalam tangki" />
-            <StatCard label="Dijadwalkan" :nilai="dijadwalkan.length" kaki="Menunggu tangki / bahan" />
-            <StatCard label="Selesai bulan ini" :nilai="selesaiBulanIni.length" kaki="Sudah packaging" />
-        </section>
+        <!-- Pesan Galat Global -->
+        <div v-if="error"
+            class="mb-6 p-4 bg-rose-50 text-rose-700 rounded-2xl border border-rose-100 flex items-center gap-3 text-sm font-semibold">
+            <i class="pi pi-exclamation-triangle text-lg"></i> {{ error }}
+        </div>
 
-        <section class="panel">
-            <div class="panel__kepala">
-                <div>
-                    <h2 class="panel__judul">Daftar sesi</h2>
-                    <p class="panel__sub">Klik "Catat packaging" untuk menutup sesi berjalan</p>
-                </div>
-                <div class="tab" role="tablist">
-                    <button v-for="t in saringan" :key="t.id" :class="{ on: saringStatus === t.id }" role="tab"
-                        :aria-selected="saringStatus === t.id" @click="saringStatus = t.id">{{ t.label }}</button>
-                </div>
-            </div>
+        <div class="bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 p-6 md:p-8">
+            <form @submit.prevent="simpanProduksi" class="flex flex-col gap-8">
 
-            <LoadingBar v-if="isLoading" pesan="Membaca sesi produksi" />
-
-            <div v-else-if="tampil.length" class="daftar">
-                <article v-for="s in tampil" :key="s.id" class="sesi">
-                    <div class="sesi__atas">
-                        <div>
-                            <p class="sesi__nomor">{{ s.nomor }}</p>
-                            <p class="sesi__produk">
-                                {{ s.formula_detail.nama_produk }}
-                                <small>v{{ s.formula_detail.versi }} · {{ s.akun_detail?.kode }}</small>
-                            </p>
-                        </div>
-                        <div class="sesi__kanan">
-                            <span class="lencana" :class="`lencana--${s.status.toLowerCase()}`">
-                                {{ labelStatus(s.status) }}
-                            </span>
-                            <p class="sesi__waktu">{{ ringkasWaktu(s) }}</p>
-                        </div>
+                <!-- BAGIAN 1: IDENTITAS (Tanpa Pemilik) -->
+                <section>
+                    <div class="flex items-center gap-2 mb-4">
+                        <div class="w-1.5 h-5 bg-indigo-500 rounded-full"></div>
+                        <h2 class="text-base font-bold text-slate-800 uppercase tracking-wide">1. Identitas WIP
+                            (Joint-Pool)</h2>
                     </div>
 
-                    <div class="sesi__isi">
-                        <span class="sesi__target">
-                            Target {{ angka(s.target_qty) }} {{ s.uom_hasil }}
-                            <template v-if="s.hasil_qty"> · hasil {{ angka(s.hasil_qty) }} {{ s.uom_hasil }}</template>
-                            <template v-if="s.tanki_detail"> · {{ s.tanki_detail.nama }}</template>
-                        </span>
-                        <span v-if="s.bahan_terpakai.length" class="sesi__bahan">
-                            <span v-for="b in s.bahan_terpakai" :key="b.id" class="sesi__chip">
-                                {{ b.nama_bahan }} {{ angka(b.qty) }} {{ b.uom }}
-                            </span>
-                        </span>
-                        <span v-if="s.hasil_packaging.length" class="sesi__kemasan">
-                            <span v-for="k in s.hasil_packaging" :key="k.id">
-                                {{ k.jumlah }}× {{ k.kemasan }}
-                            </span>
-                        </span>
+                    <div
+                        class="grid grid-cols-1 md:grid-cols-2 gap-6 p-5 bg-slate-50/50 rounded-2xl border border-slate-100">
+
+                        <!-- Jenis Proses -->
+                        <div class="flex flex-col gap-2">
+                            <label class="text-xs font-semibold text-slate-700 uppercase tracking-wide">Jenis
+                                Proses</label>
+                            <div class="relative">
+                                <i class="pi pi-cog absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                <select v-model="form.jenis_proses" @change="handleProsesChange" required
+                                    class="w-full bg-white border border-slate-200 text-slate-700 text-sm rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 block pl-11 p-3 transition-all outline-none appearance-none cursor-pointer">
+                                    <option value="" disabled>-- Pilih --</option>
+                                    <option value="Mixing">Mixing</option>
+                                    <option value="Blending">Blending</option>
+                                </select>
+                                <i
+                                    class="pi pi-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs"></i>
+                            </div>
+                        </div>
+
+                        <!-- Total Hasil Otomatis -->
+                        <div class="flex flex-col gap-2">
+                            <label class="text-xs font-semibold text-slate-700 uppercase tracking-wide">Total Hasil
+                                Fisik Akhir (KG)</label>
+                            <div class="relative">
+                                <i class="pi pi-chart-pie absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                <input type="text" :value="totalKuantitas" readonly
+                                    class="w-full bg-slate-100 border border-slate-200 text-slate-600 font-bold text-sm rounded-2xl focus:outline-none block pl-11 p-3 transition-all cursor-not-allowed appearance-none" />
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <hr class="border-slate-100" />
+
+                <!-- BAGIAN 2: PENAMPUNGAN HASIL FISIK -->
+                <section>
+                    <div class="flex items-center gap-2 mb-4">
+                        <div class="w-1.5 h-5 bg-emerald-500 rounded-full"></div>
+                        <h2 class="text-base font-bold text-slate-800 uppercase tracking-wide">2. Muara Fisik (Tangki
+                            Tujuan)</h2>
                     </div>
 
-                    <p v-if="s.catatan" class="sesi__catatan">{{ s.catatan }}</p>
+                    <div class="p-5 bg-slate-50/50 rounded-2xl border border-slate-100 flex flex-col md:flex-row gap-6">
 
-                    <div v-if="s.status === 'BERJALAN'" class="sesi__aksi">
-                        <button class="tbl tbl--utama" @click="bukaForm(s)">
-                            {{ formSesi === s.id ? 'Tutup' : 'Catat packaging' }}
+                        <!-- Pilihan Radio -->
+                        <div class="flex flex-col gap-3 min-w-[200px]">
+                            <label class="text-xs font-semibold text-slate-700 uppercase tracking-wide">Status
+                                Tangki</label>
+                            <div class="flex items-center gap-4 h-full">
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="radio" v-model="form.tipe_tangki_tujuan" value="eksisting"
+                                        class="w-4 h-4 text-emerald-600 focus:ring-emerald-500 border-gray-300">
+                                    <span class="text-sm font-medium text-slate-700">Tangki Eksisting</span>
+                                </label>
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="radio" v-model="form.tipe_tangki_tujuan" value="baru"
+                                        class="w-4 h-4 text-emerald-600 focus:ring-emerald-500 border-gray-300">
+                                    <span class="text-sm font-medium text-slate-700">Wadah Baru</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Input Dinamis Berdasarkan Pilihan -->
+                        <div class="flex-1">
+                            <div v-if="form.tipe_tangki_tujuan === 'eksisting'" class="flex flex-col gap-2">
+                                <label class="text-xs font-semibold text-slate-700 uppercase tracking-wide">Pilih Tangki
+                                    / Wadah</label>
+                                <select v-model="form.tanki_tujuan_id"
+                                    :required="form.tipe_tangki_tujuan === 'eksisting'"
+                                    class="w-full bg-white border border-slate-200 text-slate-700 text-sm rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 block p-3 transition-all outline-none">
+                                    <option value="" disabled>-- Pilih Tangki Penampungan --</option>
+                                    <option v-for="t in tankiTujuanList" :key="t.id" :value="t.id">{{ t.kode }} - {{
+                                        t.nama }}</option>
+                                </select>
+                            </div>
+
+                            <div v-else class="flex flex-col gap-2 animate-fade-in">
+                                <!-- Wadah Baru -->
+                                <label class="text-xs font-semibold text-slate-700 uppercase tracking-wide">Nama Wadah
+                                    Baru (IBC/Kempu)</label>
+                                <input type="text" v-model="form.nama_tangki_baru"
+                                    :required="form.tipe_tangki_tujuan === 'baru'" placeholder="Ex: IBC Kempu Hijau 01"
+                                    class="w-full bg-white border border-slate-200 text-slate-700 text-sm rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 block p-3 transition-all outline-none" />
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <hr class="border-slate-100" />
+
+                <!-- BAGIAN 3: INPUT KOMPOSISI -->
+                <section>
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-2">
+                            <div class="w-1.5 h-5 bg-amber-500 rounded-full"></div>
+                            <h2 class="text-base font-bold text-slate-800 uppercase tracking-wide">3. Komposisi Bahan
+                                Input</h2>
+                        </div>
+                        <button type="button" @click="tambahInput" :disabled="!form.jenis_proses"
+                            class="text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed">
+                            <i class="pi pi-plus"></i> Tambah Input
                         </button>
                     </div>
 
-                    <!-- ── form packaging (inline, sesi berjalan) ─────── -->
-                    <div v-if="formSesi === s.id" class="paket">
-                        <div class="paket__baris">
-                            <label class="isian">
-                                <span class="isian__label">Hasil jadi ({{ s.uom_hasil }})</span>
-                                <input v-model.number="draf.hasil_qty" type="number" min="0" step="0.01"
-                                    :placeholder="s.target_qty" />
-                            </label>
-                        </div>
-
-                        <fieldset class="isian">
-                            <legend class="isian__label">Kemasan</legend>
-                            <div v-for="(k, i) in draf.kemasan" :key="i" class="paket__kemasan">
-                                <input v-model="k.nama" type="text" placeholder="Pail 25KG / Jerigen 5L" />
-                                <input v-model.number="k.jumlah" type="number" min="1" step="1" placeholder="0" />
-                                <button type="button" class="hapus" :disabled="draf.kemasan.length === 1"
-                                    aria-label="Hapus kemasan" @click="hapusKemasan(i)">×</button>
-                            </div>
-                            <button type="button" class="tbl tbl--kecil" @click="draf.kemasan.push({ nama: '', jumlah: null })">
-                                + Tambah kemasan
-                            </button>
-                        </fieldset>
-
-                        <label class="isian">
-                            <span class="isian__label">Catatan <em>opsional</em></span>
-                            <input v-model="draf.catatan" type="text"
-                                placeholder="Contoh: 2 pail disisihkan untuk sampel QC" />
-                        </label>
-
-                        <p v-if="pesan" class="galat">{{ pesan }}</p>
-
-                        <div class="paket__aksi">
-                            <button type="button" class="tbl" @click="tutupForm">Batal</button>
-                            <button type="button" class="tbl tbl--utama" :disabled="sedangSimpan" @click="kirim(s)">
-                                {{ sedangSimpan ? 'Menyimpan' : 'Selesaikan sesi' }}
-                            </button>
-                        </div>
-                        <p class="paket__info">
-                            Menyelesaikan sesi mengosongkan {{ s.tanki_detail?.nama ?? 'tangki' }} dan
-                            mendebit bahan dari saldo {{ s.akun_detail?.kode }} di gudang.
-                        </p>
+                    <div v-if="!form.jenis_proses"
+                        class="p-6 text-center text-sm text-slate-500 bg-slate-50 rounded-2xl border border-slate-200 border-dashed">
+                        Silakan pilih "Jenis Proses" terlebih dahulu untuk memasukkan komposisi.
                     </div>
-                </article>
-            </div>
 
-            <EmptyState v-else pesan="Tidak ada sesi pada saringan ini."
-                petunjuk="Ubah saringan status di kanan atas." />
-        </section>
+                    <div v-else class="flex flex-col gap-3">
+                        <div v-for="(item, index) in form.komposisi" :key="item.id"
+                            class="flex flex-col md:flex-row gap-3 p-4 bg-white border border-slate-200 rounded-2xl items-start md:items-end group relative transition-all hover:border-indigo-300 shadow-sm hover:shadow-md">
+
+                            <!-- Tipe Sumber -->
+                            <div v-if="form.jenis_proses === 'Blending'" class="flex flex-col gap-2 w-full md:w-48">
+                                <label class="text-[10px] font-bold text-slate-500 uppercase">Tipe Sumber</label>
+                                <select v-model="item.tipe_sumber" @change="item.item_id = ''" required
+                                    class="w-full bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 block p-2.5 transition-all outline-none">
+                                    <option value="raw_material">Raw Material</option>
+                                    <option value="tangki_mixing">Tangki Mixing</option>
+                                </select>
+                            </div>
+
+                            <!-- Pilih Item -->
+                            <div class="flex flex-col gap-2 flex-1 w-full">
+                                <label class="text-[10px] font-bold text-slate-500 uppercase">
+                                    {{ item.tipe_sumber === 'raw_material' ? 'Nama Bahan Baku' : 'Sumber Tangki Mixing'
+                                    }}
+                                </label>
+
+                                <select v-if="item.tipe_sumber === 'raw_material'" v-model="item.item_id" required
+                                    class="w-full bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 block p-2.5 transition-all outline-none">
+                                    <option value="" disabled>-- Pilih Bahan --</option>
+                                    <option v-for="b in bahanList" :key="b.id" :value="b.id">{{ b.nama_bahan }}</option>
+                                </select>
+
+                                <select v-else v-model="item.item_id" required
+                                    class="w-full bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 block p-2.5 transition-all outline-none">
+                                    <option value="" disabled>-- Pilih Tangki Sumber --</option>
+                                    <option v-for="t in tankiList" :key="t.id" :value="t.id">{{ t.kode }} - {{ t.nama }}
+                                    </option>
+                                </select>
+                            </div>
+
+                            <!-- Qty Dipakai -->
+                            <div class="flex flex-col gap-2 w-full md:w-40">
+                                <label class="text-[10px] font-bold text-slate-500 uppercase">Kuantitas Input
+                                    (KG)</label>
+                                <input v-model.number="item.qty" type="number" min="0.01" step="0.01" placeholder="0"
+                                    required
+                                    class="w-full bg-slate-50 border border-slate-200 text-slate-800 font-bold rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 block p-2.5 transition-all outline-none text-right" />
+                            </div>
+
+                            <button type="button" @click="hapusInput(index)" v-if="form.komposisi.length > 1"
+                                class="w-full md:w-auto mt-2 md:mt-0 px-4 py-2.5 text-rose-500 bg-rose-50 hover:bg-rose-100 rounded-xl transition-colors flex items-center justify-center h-[42px]"
+                                title="Hapus baris ini">
+                                <i class="pi pi-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <hr class="border-slate-100" />
+
+                <!-- BAGIAN 4: CATATAN & SUBMIT -->
+                <section>
+                    <div class="flex flex-col gap-2">
+                        <label class="text-xs font-semibold text-slate-700 uppercase tracking-wide">Catatan
+                            Produksi</label>
+                        <textarea v-model="form.catatan" rows="2" placeholder="Catat kondisi pencampuran, dsb..."
+                            class="w-full bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 block p-4 transition-all outline-none"></textarea>
+                    </div>
+
+                    <div v-if="pesanSukses"
+                        class="mt-6 p-4 bg-emerald-50 text-emerald-700 rounded-2xl border border-emerald-100 flex items-center gap-3 text-sm font-semibold">
+                        <i class="pi pi-check-circle text-lg"></i> {{ pesanSukses }}
+                    </div>
+
+                    <div class="mt-8 flex justify-end gap-3">
+                        <button type="button" @click="resetForm"
+                            class="px-6 py-3 rounded-2xl text-sm font-semibold text-slate-600 hover:bg-slate-100 active:scale-95 transition-all border border-slate-200">
+                            Reset Form
+                        </button>
+                        <button type="submit"
+                            :disabled="isMenyimpan || isLoading || form.komposisi.length === 0 || !form.jenis_proses || totalKuantitas <= 0"
+                            class="px-8 py-3 rounded-2xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 active:scale-95 transition-all shadow-md shadow-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+                            <i :class="isMenyimpan ? 'pi pi-spin pi-spinner' : 'pi pi-sync'"></i>
+                            {{ isMenyimpan ? 'Menyimpan...' : 'Simpan Produksi' }}
+                        </button>
+                    </div>
+                </section>
+            </form>
+        </div>
     </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useProduksi } from '@/features/rnd/composables/useProduksi'
-import StatCard from '@/components/ui/StatCard.vue'
-import EmptyState from '@/components/ui/EmptyState.vue'
-import LoadingBar from '@/components/ui/LoadingBar.vue'
 
 const {
-    tampil, isLoading, sedangSimpan, saringStatus,
-    berjalan, dijadwalkan, selesaiBulanIni,
-    muatSesi, catatPackaging,
+    isLoading,
+    isMenyimpan,
+    error,
+    tankiList,
+    tankiTujuanList,
+    bahanList,
+    muatReferensi,
+    simpanPemakaianBahan
 } = useProduksi()
 
-onMounted(muatSesi)
+const pesanSukses = ref('')
 
-const saringan = [
-    { id: 'semua', label: 'Semua' },
-    { id: 'berjalan', label: 'Berjalan' },
-    { id: 'dijadwalkan', label: 'Antre' },
-    { id: 'selesai', label: 'Selesai' },
-]
+const form = reactive({
+    jenis_proses: '',
+    tipe_tangki_tujuan: 'eksisting',
+    nama_tangki_baru: '',
+    tanki_tujuan_id: '',
+    catatan: '',
+    komposisi: [
+        { id: Date.now(), tipe_sumber: 'raw_material', item_id: '', qty: null }
+    ]
+})
 
-const formSesi = ref(null)
-const pesan = ref('')
-const draf = reactive({ hasil_qty: null, kemasan: [{ nama: '', jumlah: null }], catatan: '' })
+// Kalkulasi Otomatis Total QTY
+const totalKuantitas = computed(() => {
+    return form.komposisi.reduce((total, item) => {
+        const nilai = parseFloat(item.qty) || 0
+        return total + nilai
+    }, 0)
+})
 
-const bukaForm = (s) => {
-    if (formSesi.value === s.id) return tutupForm()
-    formSesi.value = s.id
-    pesan.value = ''
-    Object.assign(draf, { hasil_qty: null, kemasan: [{ nama: '', jumlah: null }], catatan: '' })
+const handleProsesChange = () => {
+    form.komposisi = [{
+        id: Date.now(),
+        tipe_sumber: 'raw_material',
+        item_id: '',
+        qty: null
+    }]
 }
-const tutupForm = () => { formSesi.value = null; pesan.value = '' }
-const hapusKemasan = (i) => {
-    if (draf.kemasan.length > 1) draf.kemasan.splice(i, 1)
-}
 
-const kirim = async (s) => {
-    pesan.value = ''
-    const hasil = await catatPackaging(s.id, {
-        hasil_qty: draf.hasil_qty,
-        kemasan: draf.kemasan,
-        catatan: draf.catatan,
+const tambahInput = () => {
+    form.komposisi.push({
+        id: Date.now(),
+        tipe_sumber: 'raw_material',
+        item_id: '',
+        qty: null
     })
-    if (hasil.success) tutupForm()
-    else pesan.value = hasil.message
 }
 
-const angka = (n) =>
-    Number(n).toLocaleString('id-ID', { maximumFractionDigits: 2 })
-
-const tanggalJam = (iso) => {
-    const d = new Date(iso)
-    return `${d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })} ${d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`
+const hapusInput = (index) => {
+    form.komposisi.splice(index, 1)
 }
 
-const ringkasWaktu = (s) => {
-    if (s.status === 'DIJADWALKAN') return 'Belum dimulai'
-    if (s.status === 'BERJALAN') return `Mulai ${tanggalJam(s.mulai_pada)}`
-    return `Selesai ${tanggalJam(s.selesai_pada)}`
+const resetForm = () => {
+    form.jenis_proses = ''
+    form.tipe_tangki_tujuan = 'eksisting'
+    form.nama_tangki_baru = ''
+    form.tanki_tujuan_id = ''
+    form.catatan = ''
+    form.komposisi = [{ id: Date.now(), tipe_sumber: 'raw_material', item_id: '', qty: null }]
+    pesanSukses.value = ''
+    if (error.value) error.value = null
 }
 
-const labelStatus = (st) => ({
-    DIJADWALKAN: 'Antre',
-    BERJALAN: 'Berjalan',
-    SELESAI: 'Selesai',
-}[st] ?? st)
+const simpanProduksi = async () => {
+    // Validasi Dasar
+    if (form.tipe_tangki_tujuan === 'eksisting' && !form.tanki_tujuan_id) {
+        alert("Mohon pilih Tangki Penampungan hasil.")
+        return
+    }
+
+    if (form.tipe_tangki_tujuan === 'baru' && !form.nama_tangki_baru) {
+        alert("Mohon ketikkan nama wadah/tangki baru.")
+        return
+    }
+
+    // Validasi Komposisi
+    const adaInputKosong = form.komposisi.some(k => !k.item_id || k.qty <= 0)
+    if (adaInputKosong || totalKuantitas.value <= 0) {
+        alert("Mohon lengkapi semua data komposisi (Total Kuantitas harus lebih dari 0).")
+        return
+    }
+
+    pesanSukses.value = ''
+
+    // Pembangunan Payload ke Backend
+    const payload = {
+        jenis_proses: form.jenis_proses,
+        // Nama hasil otomatis mengambil nama wadah baru
+        nama_hasil: form.tipe_tangki_tujuan === 'baru' ? form.nama_tangki_baru : null,
+        hasil_qty: totalKuantitas.value,
+        tipe_tangki_tujuan: form.tipe_tangki_tujuan,
+        nama_tangki_baru: form.tipe_tangki_tujuan === 'baru' ? form.nama_tangki_baru : null,
+        tanki_tujuan_id: form.tipe_tangki_tujuan === 'eksisting' ? form.tanki_tujuan_id : null,
+        catatan: form.catatan,
+        komposisi: form.komposisi.map(k => ({
+            tipe_sumber: k.tipe_sumber,
+            item_id: k.item_id,
+            qty: k.qty
+        }))
+    }
+
+    const hasil = await simpanPemakaianBahan(payload)
+
+    if (hasil.success) {
+        pesanSukses.value = `Berhasil! WIP telah disimpan dan dialokasikan ke tangki tujuan.`
+        setTimeout(resetForm, 3000)
+    }
+}
+
+onMounted(() => {
+    muatReferensi()
+})
 </script>
 
 <style scoped>
-.kepala { margin-bottom: 1.5rem; }
-.remah { margin: 0 0 .3rem; font-size: .75rem; color: var(--redup-2); }
-.remah a { color: var(--redup); text-decoration: none; }
-.remah a:hover { color: var(--teks); text-decoration: underline; }
-.judul { margin: 0; font-size: 1.625rem; font-weight: 700; letter-spacing: -.02em; }
-.sub { margin: .3rem 0 0; font-size: .875rem; color: var(--redup); }
-
-.metrik {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
-    gap: 1px; background: var(--garis); border: 1px solid var(--garis);
-    border-radius: var(--lengkung); overflow: hidden; margin-bottom: 1.25rem;
+.animate-fade-in {
+    animation: fadeIn 0.3s ease-out forwards;
 }
 
-.panel { background: var(--panel); border: 1px solid var(--garis); border-radius: var(--lengkung); overflow: hidden; }
-.panel__kepala {
-    display: flex; justify-content: space-between; align-items: center; gap: 1rem;
-    flex-wrap: wrap; padding: 1.1rem 1.25rem; border-bottom: 1px solid var(--garis);
-}
-.panel__judul { margin: 0; font-size: .9375rem; font-weight: 700; }
-.panel__sub { margin: .2rem 0 0; font-size: .75rem; color: var(--redup); }
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(5px);
+    }
 
-.tab { display: flex; gap: .25rem; background: var(--latar); border: 1px solid var(--garis); border-radius: var(--lengkung-kecil); padding: .2rem; }
-.tab button {
-    font-family: inherit; font-size: .75rem; color: var(--redup);
-    background: none; border: none; border-radius: 6px; padding: .35rem .7rem; cursor: pointer;
-}
-.tab button.on { background: var(--panel); color: var(--teks); font-weight: 600; box-shadow: var(--bayang); }
-
-.daftar { display: flex; flex-direction: column; }
-.sesi { padding: 1.1rem 1.25rem; border-bottom: 1px solid var(--garis); }
-.sesi:last-child { border-bottom: none; }
-
-.sesi__atas { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
-.sesi__nomor { margin: 0; font-size: .6875rem; font-weight: 700; letter-spacing: .06em; color: var(--redup-2); }
-.sesi__produk { margin: .2rem 0 0; font-size: .9375rem; font-weight: 600; }
-.sesi__produk small { font-weight: 400; color: var(--redup); margin-left: .3rem; }
-.sesi__kanan { text-align: right; }
-.sesi__waktu { margin: .35rem 0 0; font-size: .6875rem; color: var(--redup-2); }
-
-.lencana { font-size: .625rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: .2rem .5rem; border-radius: 5px; }
-.lencana--berjalan { color: var(--biru); background: var(--biru-latar); }
-.lencana--dijadwalkan { color: var(--kuning); background: var(--kuning-latar); }
-.lencana--selesai { color: var(--hijau); background: var(--hijau-latar); }
-
-.sesi__isi { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; margin-top: .6rem; }
-.sesi__target { font-size: .8125rem; color: var(--teks-2); }
-.sesi__bahan { display: flex; gap: .35rem; flex-wrap: wrap; }
-.sesi__chip { font-size: .6875rem; color: var(--redup); background: var(--latar); padding: .15rem .45rem; border-radius: 5px; }
-.sesi__kemasan { font-size: .75rem; color: var(--hijau); font-weight: 500; display: flex; gap: .6rem; }
-
-.sesi__catatan {
-    margin: .6rem 0 0; padding: .55rem .75rem; font-size: .8125rem;
-    color: var(--kuning); background: var(--kuning-latar);
-    border: 1px solid var(--kuning-garis); border-radius: var(--lengkung-kecil);
-}
-
-.sesi__aksi { margin-top: .75rem; }
-
-.tbl {
-    display: inline-flex; align-items: center; gap: .35rem;
-    font-family: inherit; font-size: .8125rem; font-weight: 500;
-    color: var(--teks); background: var(--panel); border: 1px solid var(--garis-tegas);
-    border-radius: var(--lengkung-kecil); padding: .5rem .9rem; cursor: pointer; text-decoration: none;
-}
-.tbl:hover { border-color: var(--teks); }
-.tbl--utama { color: var(--panel); background: var(--teks); border-color: var(--teks); }
-.tbl--utama:hover { opacity: .88; }
-.tbl--utama:disabled { opacity: .5; cursor: default; }
-.tbl--kecil { font-size: .75rem; padding: .35rem .6rem; margin-top: .4rem; }
-
-.paket { margin-top: .9rem; padding: 1rem; background: var(--latar); border: 1px solid var(--garis); border-radius: var(--lengkung-kecil); }
-.paket__baris { margin-bottom: .9rem; max-width: 16rem; }
-.paket__kemasan { display: grid; grid-template-columns: 1fr 6rem 2rem; gap: .5rem; margin-bottom: .5rem; }
-.paket__aksi { display: flex; gap: .6rem; justify-content: flex-end; margin-top: .9rem; }
-.paket__info { margin: .7rem 0 0; font-size: .75rem; color: var(--redup-2); }
-
-.isian { display: block; border: none; padding: 0; margin: 0 0 .9rem; }
-.isian__label {
-    display: block; margin-bottom: .35rem; font-size: .6875rem; font-weight: 700;
-    letter-spacing: .08em; text-transform: uppercase; color: var(--redup);
-}
-.isian__label em { font-style: normal; font-weight: 400; letter-spacing: 0; text-transform: none; }
-.isian input {
-    width: 100%; font-family: inherit; font-size: .875rem; color: var(--teks);
-    background: var(--panel); border: 1px solid var(--garis);
-    border-radius: var(--lengkung-kecil); padding: .55rem .7rem;
-}
-.isian input:focus { outline: none; border-color: var(--biru); }
-
-.hapus {
-    font-family: inherit; font-size: 1rem; color: var(--redup);
-    background: none; border: 1px solid var(--garis); border-radius: var(--lengkung-kecil); cursor: pointer;
-}
-.hapus:hover:not(:disabled) { color: var(--merah); border-color: var(--merah); }
-.hapus:disabled { opacity: .35; cursor: default; }
-
-.galat {
-    margin: 0 0 .75rem; padding: .6rem .8rem; font-size: .8125rem; color: var(--merah);
-    background: var(--merah-latar); border-radius: var(--lengkung-kecil); white-space: pre-line;
-}
-
-@media (max-width: 640px) {
-    .sesi__atas { flex-direction: column; }
-    .sesi__kanan { text-align: left; }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 </style>

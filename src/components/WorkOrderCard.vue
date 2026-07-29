@@ -20,8 +20,9 @@
 
         <div class="wo__bawah">
             <div class="wo__orang">
-                <span v-for="p in wo.penugasan" :key="p.id" class="wo__tag"
-                    :class="{ 'wo__tag--saya': p.staff === staffId }">{{ p.staff_nama }}</span>
+                <!-- [FIX] Key menggunakan p.staff dan teks menggunakan p.nama -->
+                <span v-for="p in wo.penugasan" :key="p.staff" class="wo__tag"
+                    :class="{ 'wo__tag--saya': p.staff === staffId }">{{ p.nama }}</span>
             </div>
 
             <button v-if="bisaApprove" class="wo__ok" :disabled="sibuk" @click="$emit('approve', wo)">{{ sibuk ?

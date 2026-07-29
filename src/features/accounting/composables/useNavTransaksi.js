@@ -56,6 +56,15 @@ export const TRANSAKSI = [
         roles: [ROLE.STAFF],
         activate: true,
     },
+    {
+        id: 'pengeluaran',
+        label: 'Pengeluaran',
+        ringkas: 'Catat biaya OpEx & CapEx',
+        ikon: 'pi-money-bill',
+        rute: '/accounting/transaksi/pengeluaran',
+        roles: [ROLE.STAFF],
+        activate: true,
+    },
 ]
 
 const bolehLihat = (item, role, isSupervisor) =>

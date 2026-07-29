@@ -81,14 +81,13 @@
 <script setup>
 import { computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { useProduksi } from '@/features/rnd/composables/useProduksi'
+import { useTankMonitoring } from '@/features/master/composables/useTankMonitoring'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import LoadingBar from '@/components/ui/LoadingBar.vue'
 
 const route = useRoute()
 const dariGudang = computed(() => route.path.startsWith('/warehouse'))
-
-const { daftarTanki, isLoading, muatTanki } = useProduksi()
+const { daftarTanki, isLoading, muatTanki } = useTankMonitoring()
 
 onMounted(muatTanki)
 

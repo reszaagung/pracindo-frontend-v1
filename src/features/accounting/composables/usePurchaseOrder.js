@@ -18,12 +18,10 @@ export function usePurchaseOrder() {
     const cari = ref('')
     const saringStatus = ref('semua')
 
-    // 1. Muat Data Utama (PO, Akun/Entitas, Suplier)
     const muat = async () => {
         isLoading.value = true
         error.value = null
         try {
-            // Menggunakan Rute Asli Sesuai Daftar Endpoint Backend Anda
             const [resPO, resAkun, resSuplier] = await Promise.all([
                 api.get('purchase-order/'),
                 api.get('staff_user/entitas-publik/'),
@@ -40,7 +38,6 @@ export function usePurchaseOrder() {
         }
     }
 
-    // 2. Muat Detail PO spesifik
     const muatDetail = async (poId) => {
         isLoading.value = true
         error.value = null
@@ -55,14 +52,11 @@ export function usePurchaseOrder() {
         }
     }
 
-    // 3. Catat Penerimaan Fisik Gudang
     const terimaBarang = async (poId, items, catatan = '') => {
         if (!items?.length) {
             return { success: false, message: 'Tidak ada kuantitas yang diisi.' }
         }
 
-        // [PERBAIKAN]: Memaksa struktur mapping data agar selalu cocok 
-        // dengan requirement serializer/services DRF backend.
         const payloadItems = items.map(item => ({
             item_id: item.item_id || item.id,
             kuantitas: Number(item.kuantitas || item.qty),
@@ -88,7 +82,7 @@ export function usePurchaseOrder() {
         }
     }
 
-    // 4. Request Nomor PO Sementara
+
     const previewNomor = async (akunId, tanggal) => {
         if (!akunId || !tanggal) return null
         try {
@@ -101,7 +95,6 @@ export function usePurchaseOrder() {
         }
     }
 
-    // 5. Submit Form Buat PO Baru
     const buatPO = async ({ akun, suplier, tanggal, daftar_item,
         tanggal_jatuh_tempo = null, catatan = '' }) => {
         if (!daftar_item?.length) {

@@ -1,5 +1,5 @@
 <!--
-  src/features/accounting/views/PODetail.vue
+  src/features/accounting/views/PurchaseOrderDetail.vue
   ===========================================
   Detail PO. Satu layar, DUA PERAN:
 

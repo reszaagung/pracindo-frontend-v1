@@ -1,45 +1,24 @@
 /**
  * src/features/accounting/composables/useDocument.js
  * ===================================================
- * Kontrol kelengkapan dokumen PO — TERSAMBUNG API. Dokumen NYATA-nya
- * disimpan di app `dokumen` (Lampiran, append-only), bukan di composable
- * ini. Layar ini merakit "audit row" per PO dari dua sumber:
+ * Kontrol kelengkapan dokumen PO — TERSAMBUNG API. 
  *
- *   GET  purchase-order/            list PO (scoped ke Akun) -> partner, tanggal,
- *                                   status_pembayaran, nomor
- *   GET  dokumen/lampiran/          ?purchase_order=&jenis=  (di sini diambil
- *                                   sekali lalu dikelompokkan di klien)
- *   POST dokumen/lampiran/          multipart {purchase_order, jenis, file,
- *                                   nomor_dokumen?} -> unggah / revisi
- *
- * KENAPA kelengkapan dirakit di klien: PurchaseOrderSerializer TIDAK
- * mengirim field `kelengkapan` (statistik_kelengkapan_po ada di
- * dokumen/services tapi belum di-expose). Bentuk yang layar ini butuh —
- * nomor & URL file PER dokumen — memang cuma ada di daftar lampiran, bukan
- * di ringkasan boolean. Kalau nanti `kelengkapan` di-expose di PO
- * serializer, ini bisa disederhanakan (dan sekalian memperbaiki
- * dokumenKurang di useAccounting/useTransaksi yang sekarang selalu kosong).
- *
- * ⚠ APPEND-ONLY: backend tidak punya endpoint hapus lampiran (salah unggah
- * = unggah ulang jadi revisi baru). Karena itu TIDAK ada fungsi hapus di
- * sini — tombol hapus di prototipe lama sengaja dibuang.
- *
- * ⚠ JENIS wajib file: POST lampiran menolak tanpa `file`. Modal upload
- * WAJIB punya input file.
+ * ALUR AKUNTANSI ERP:
+ * Layar audit ini HANYA memunculkan PO yang barangnya sudah diterima 
+ * oleh tim Gudang (Goods Receipt). PO yang belum tiba tidak akan 
+ * masuk ke dalam antrean audit dokumen.
  */
 
 import { reactive, ref, computed } from 'vue'
 import api from '@/utils/api'
 import { bacaError } from '@/utils/error'
 
-/** Tiga dokumen yang dihitung kelengkapannya untuk PO (cermin JENIS_WAJIB_PO). */
 const WAJIB = [
     { key: 'invoice', jenis: 'INVOICE', label: 'Invoice' },
     { key: 'faktur_pajak', jenis: 'FAKTUR', label: 'Faktur Pajak' },
     { key: 'surat_jalan', jenis: 'SURAT_JALAN', label: 'Surat Jalan' },
 ]
 
-/** Label UI -> enum backend (dipakai saat memilih jenis di modal upload). */
 const LABEL_KE_JENIS = {
     'Invoice': 'INVOICE',
     'Faktur Pajak': 'FAKTUR',
@@ -56,18 +35,29 @@ export function useDocument() {
     const error = ref(null)
 
     const searchQuery = ref('')
-    const statusFilter = ref('all')   // all | lengkap | tidak_lengkap
+    const statusFilter = ref('all')
 
     const uploadForm = reactive({
-        po_id: null,            // PK PurchaseOrder — dikirim sebagai FK
-        po_reference: '',       // nomor PO — tampilan saja
+        po_id: null,
+        po_reference: '',
         partner_name: '',
         document_type: 'Invoice',
         document_number: '',
-        file: null,             // File dari <input type="file">
+        file: null,
     })
 
-    /** Muat PO + seluruh lampiran, lalu biarkan computed merakit audit row. */
+    /** 
+     * Fungsi pengekstrak array agar kebal terhadap berbagai variasi struktur 
+     * JSON dari backend Django (menghindari error .filter is not a function).
+     */
+    const ekstrakArray = (responseData) => {
+        if (!responseData) return []
+        if (Array.isArray(responseData)) return responseData
+        if (Array.isArray(responseData.results)) return responseData.results
+        if (Array.isArray(responseData.data)) return responseData.data
+        return [responseData]
+    }
+
     const muat = async () => {
         isLoading.value = true
         error.value = null
@@ -76,8 +66,11 @@ export function useDocument() {
                 api.get('purchase-order/'),
                 api.get('dokumen/lampiran/'),
             ])
-            daftarPO.value = po.data.results || po.data
-            daftarLampiran.value = lampiran.data.results || lampiran.data
+
+            // Ekstrak data dengan aman
+            daftarPO.value = ekstrakArray(po.data)
+            daftarLampiran.value = ekstrakArray(lampiran.data)
+
         } catch (err) {
             error.value = bacaError(err, 'Gagal memuat data dokumen.')
         } finally {
@@ -85,14 +78,10 @@ export function useDocument() {
         }
     }
 
-    /**
-     * Peta poId -> (jenis -> lampiran TERKINI). Backend mengurutkan
-     * -diunggah_pada, jadi kemunculan PERTAMA tiap (po, jenis) = versi terbaru.
-     */
     const lampiranPerPO = computed(() => {
         const peta = new Map()
         for (const l of daftarLampiran.value) {
-            if (!l.purchase_order) continue          // lewati lampiran SO / surat jalan
+            if (!l.purchase_order) continue
             if (!peta.has(l.purchase_order)) peta.set(l.purchase_order, new Map())
             const per = peta.get(l.purchase_order)
             if (!per.has(l.jenis)) per.set(l.jenis, l)
@@ -120,24 +109,25 @@ export function useDocument() {
         return files
     }
 
-    /** {count, percentage, isComplete} atas 3 dokumen wajib. */
     const getComplianceStats = (files) => {
         const count = WAJIB.filter(w => files?.[w.key]?.exists).length
         return { count, percentage: Math.round((count / WAJIB.length) * 100), isComplete: count === WAJIB.length }
     }
 
-    /** Satu baris audit per PO aktif. */
     const auditData = computed(() =>
         daftarPO.value
-            .filter(po => !po.dibatalkan_pada)
+            // Filter Mutlak: Pastikan PO aktif & barang BUKAN "belum diterima"
+            .filter(po => po.aktif !== false && String(po.status_penerimaan || '').toUpperCase() !== 'BELUM_DITERIMA')
             .map(po => {
                 const files = filesUntuk(po.id)
                 return {
-                    po_id: po.nomor,                              // tampilan
-                    id: po.id,                                    // PK untuk upload
-                    partner: po.suplier_detail?.nama ?? '—',
+                    // Penambahan fallback yang luas jika nama kolom serializer berubah-ubah
+                    po_id: po.nomor || po.po_no || po.id_transaksi || '—',
+                    id: po.id,
+                    partner: po.suplier_detail?.nama || po.nama_supplier || po.supplier?.nama_suplier || '—',
                     date: po.tanggal,
-                    payment_status: po.status_pembayaran,         // UNPAID | PARTIAL | PAID
+                    status_penerimaan: po.status_penerimaan,
+                    payment_status: po.status_pembayaran,
                     files,
                     lengkap: getComplianceStats(files).isComplete,
                 }
@@ -161,7 +151,6 @@ export function useDocument() {
     const fullyCompliantCount = computed(() => auditData.value.filter(x => x.lengkap).length)
     const missingDocsCount = computed(() => auditData.value.filter(x => !x.lengkap).length)
 
-    /** Siapkan modal untuk satu PO + jenis tertentu (dari tombol "Upload" di baris). */
     const siapkanUpload = (row, docLabel = 'Invoice') => {
         uploadForm.po_id = row.id
         uploadForm.po_reference = row.po_id
@@ -176,10 +165,6 @@ export function useDocument() {
         uploadForm.file = fileList && fileList.length ? fileList[0] : null
     }
 
-    /**
-     * Unggah / revisi lampiran. Mengembalikan {success, message} — komponen
-     * yang menampilkan umpan balik, bukan alert().
-     */
     const handleUploadDocument = async () => {
         if (!uploadForm.po_id) return { success: false, message: 'PO tidak dikenali.' }
         if (!uploadForm.file) return { success: false, message: 'Pilih berkas dokumen dulu.' }
@@ -208,14 +193,10 @@ export function useDocument() {
     }
 
     return {
-        // state
         isLoading, sedangSimpan, error,
         searchQuery, statusFilter, uploadForm,
-        // turunan
         filteredAuditData, totalTransactions, fullyCompliantCount, missingDocsCount,
-        getComplianceStats,
-        // aksi
-        muat, siapkanUpload, setFile, handleUploadDocument,
+        getComplianceStats, muat, siapkanUpload, setFile, handleUploadDocument,
         WAJIB, LABEL_KE_JENIS,
     }
 }

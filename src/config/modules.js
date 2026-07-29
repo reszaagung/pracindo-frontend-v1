@@ -18,7 +18,6 @@ export const MODUL = [
     ringkas: 'Purchase order, tagihan, dokumen',
     ikon: 'buku',
     rute: '/accounting',
-    // Gudang ikut di sini HANYA untuk akses via URL/PO Detail, bukan kartu dashboard
     roles: [ROLE.STAFF, ROLE.GUDANG],
     siap: true,
     sembunyiDiDashboard: true,
@@ -35,7 +34,6 @@ export const MODUL = [
     ringkas: 'Pembelian dan penjualan',
     ikon: 'buku',
     rute: '/accounting/transaksi',
-    // ROLE.GUDANG sudah dihapus agar tidak muncul di dashboard staf gudang
     roles: [ROLE.STAFF, ROLE.SALES],
     siap: true,
     menu: [
@@ -49,7 +47,6 @@ export const MODUL = [
     ringkas: 'Hutang, piutang, dan kelengkapan dokumen',
     ikon: 'buku',
     rute: '/accounting/invoice',
-    // ROLE.GUDANG sudah dihapus
     roles: [ROLE.STAFF],
     siap: true,
     menu: [

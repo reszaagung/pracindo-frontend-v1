@@ -51,8 +51,6 @@ const routes = [
         name: 'accounting',
         component: () => import('@/features/accounting/views/DashboardAccounting.vue'),
       },
-      // [FIX] Daftar PO — sebelumnya tidak ada. Dipakai oleh pintasan Dashboard,
-      // breadcrumb PO Detail, tombol Batal & redirect after-save PO Create.
       {
         path: 'po',
         name: 'accounting-po',
@@ -73,7 +71,7 @@ const routes = [
     component: () => import('@/features/accounting/layout/InvoiceLayout.vue'),
     meta: { perluLogin: true, modul: 'invoice' },
     children: [
-      // [FIX] buka parent telanjang -> arahkan ke Invoice, bukan rail kosong.
+
       {
         path: '',
         redirect: '/accounting/invoice',
@@ -81,7 +79,6 @@ const routes = [
       {
         path: '/accounting/invoice',
         name: 'accounting-invoice',
-        // [FIX] alias untuk link `/accounting/tagihan` (useAccounting, Document breadcrumb).
         alias: '/accounting/tagihan',
         component: () => import('@/features/accounting/views/Invoice.vue'),
       },
@@ -90,8 +87,7 @@ const routes = [
         name: 'accounting-document',
         component: () => import('@/features/accounting/views/Document.vue'),
       },
-      // [FIX] path relatif 'suplier' (-> /accounting/review-layout/suplier, orphan)
-      // diganti absolut agar cocok dengan link nav `/accounting/suplier`.
+
       {
         path: '/accounting/suplier',
         name: 'accounting-suplier',
@@ -117,9 +113,12 @@ const routes = [
       {
         path: 'pembayaran',
         name: 'transaksi-pembayaran',
-        // [FIX] alias untuk link `/accounting/payment` (useNavInvoice, modules.js).
         alias: '/accounting/payment',
         component: () => import('@/features/accounting/views/PaymentSuplier.vue'),
+      },
+      {
+        path: 'pengeluaran',
+        component: () => import('@/features/accounting/views/Expend.vue'),
       },
       {
         path: 'penjualan',
@@ -129,15 +128,12 @@ const routes = [
       {
         path: 'penjualan/buat',
         name: 'transaksi-penjualan-buat',
-        // [FIX] alias untuk link `/accounting/sales-order/buat` di SalesOrder.vue.
         alias: '/accounting/sales-order/buat',
         component: () => import('@/features/accounting/views/CreateSalesOrder.vue'),
       },
       {
         path: 'penjualan/:id',
         name: 'transaksi-penjualan-detail',
-        // [FIX] alias untuk link `/accounting/sales-order/:id` di SalesOrder.vue.
-        // 'buat' didahulukan di atas -> tetap menang atas :id (static > dynamic).
         alias: '/accounting/sales-order/:id',
         component: () => import('@/features/accounting/views/SalesOrderDetail.vue'),
       },
@@ -156,24 +152,29 @@ const routes = [
         component: () => import('@/features/warehouse/views/DashboardGudang.vue'),
       },
       {
-        path: 'saldo',
-        name: 'warehouse-saldo',
-        component: () => import('@/features/warehouse/views/StockRaw.vue'),
-      },
-      {
-        path: 'inbound',
-        name: 'warehouse-inbound',
-        component: () => import('@/features/warehouse/views/Received.vue'),
-      },
-      {
-        path: 'outbound',
-        name: 'warehouse-outbound',
+        path: 'packaging',
+        name: 'warehouse-packaging',
         component: () => import('@/features/warehouse/views/Packaging.vue'),
       },
       {
-        path: 'opname',
-        name: 'warehouse-opname',
-        component: () => import('@/features/warehouse/views/Opname.vue'),
+        path: 'received',
+        name: 'warehouse-received',
+        component: () => import('@/features/warehouse/views/Received.vue'),
+      },
+      {
+        path: 'received-package',
+        name: 'warehouse-received-package',
+        component: () => import('@/features/warehouse/views/ReceivedPackage.vue'),
+      },
+      {
+        path: 'retur',
+        name: 'warehouse-retur',
+        component: () => import('@/features/warehouse/views/Retur.vue'),
+      },
+      {
+        path: 'tangki',
+        name: 'warehouse-tangki',
+        component: () => import('@/features/master/views/TankMonitoring.vue'),
       },
     ],
   },
@@ -186,7 +187,7 @@ const routes = [
     children: [
       {
         path: '',
-        redirect: '/rnd/produksi', // Otomatis arahkan ke produksi
+        redirect: '/rnd/produksi',
       },
       {
         path: 'produksi',
@@ -203,7 +204,6 @@ const routes = [
         name: 'rnd-tangki',
         component: () => import('@/features/master/views/TankMonitoring.vue'),
       },
-      // ... (rute riset, prototipe, qc bisa Anda tambahkan nanti)
     ],
   },
 
@@ -252,7 +252,21 @@ const routes = [
         name: 'master-produk',
         component: () => import('@/features/master/views/Produk.vue'),
       },
+      {
+        path: 'kemasan',
+        name: 'master-kemasan',
+        component: () => import('@/features/master/views/Kemasan.vue'),
+      },
     ],
+  }, {
+    path: '/executive',
+    component: () => import('@/features/executive/layout/ExecutiveLayout.vue'),
+    children: [
+      {
+        path: '', // Akan merender route /executive
+        component: () => import('@/features/executive/views/DashboardExecutive.vue')
+      }
+    ]
   },
 
   {

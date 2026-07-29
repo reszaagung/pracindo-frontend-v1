@@ -1,108 +1,100 @@
-/**
- * src/features/rnd/composables/useProduksi.js
- * ============================================
- * Sesi produksi & tangki. Kontrak (usulan — lihat SPEK-BACKEND.md):
- *
- *   GET  produksi/sesi/                 ?status=
- *   GET  produksi/tanki/
- *   POST produksi/sesi/{id}/packaging/  {hasil_qty, kemasan:[{nama,jumlah}], catatan?}
- *
- * PACKAGING = sesi SELESAI. Service backend HARUS: set status/hasil,
- * kosongkan tangki, debit saldo & fisik_tanki per bahan (mutasi PEMAKAIAN).
- * Lihat SPEK-BACKEND.md.
- */
-
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import api from '@/utils/api'
 import { bacaError } from '@/utils/error'
 
-
 export function useProduksi() {
-    const daftarSesi = ref([])
-    const daftarTanki = ref([])
     const isLoading = ref(false)
-    const sedangSimpan = ref(false)
+    const isMenyimpan = ref(false)
     const error = ref(null)
-    const saringStatus = ref('semua')   // semua | berjalan | dijadwalkan | selesai
 
-    const muatSesi = async () => {
+    const tankiList = ref([])
+    const tankiTujuanList = ref([])
+    const bahanList = ref([])
+    const daftarTanki = ref([])
+
+    const muatReferensi = async () => {
         isLoading.value = true
         error.value = null
         try {
+            // Membaca data referensi tangki dari inventory dan bahan baku dari saldo stock-raw
+            const [resTanki, resBahan] = await Promise.all([
+                api.get('inventory/tanki/'),
+                api.get('stock-raw/saldo/')
+            ])
+
+            const semuaTanki = resTanki.data?.results || resTanki.data || []
+            tankiList.value = semuaTanki.filter(t => t.aktif && ['MIXING', 'BLENDING'].includes(t.jenis))
+            tankiTujuanList.value = semuaTanki.filter(t => t.aktif)
+
+            const semuaBahan = resBahan.data?.results || resBahan.data || []
+            // Ekstrak nama bahan baku yang unik dari saldo
+            const namaBahanUnik = [...new Set(semuaBahan.map(b => b.nama_bahan))]
+            bahanList.value = namaBahanUnik.map(nama => ({ id: nama, nama_bahan: nama }))
+
         } catch (err) {
-            error.value = bacaError(err, 'Gagal memuat sesi produksi.')
+            error.value = bacaError(err, 'Gagal memuat data referensi (Tangki & Bahan Baku).')
         } finally {
             isLoading.value = false
+        }
+    }
+
+    const simpanPemakaianBahan = async (payload) => {
+        isMenyimpan.value = true
+        error.value = null
+        try {
+            const response = await api.post('produksi/sesi/input-bahan/', payload)
+            return { success: true, data: response.data }
+        } catch (err) {
+            const msg = bacaError(err, 'Gagal mencatat data produksi ke sistem.')
+            error.value = msg
+            return { success: false, message: msg }
+        } finally {
+            isMenyimpan.value = false
         }
     }
 
     const muatTanki = async () => {
         isLoading.value = true
+        error.value = null
         try {
+            const res = await api.get('inventory/tanki/')
+            const rawData = res.data?.results || res.data || []
+
+            daftarTanki.value = rawData.map(t => {
+                const isTerpakai = t.isi && t.isi.length > 0
+
+                const sesiNomor = isTerpakai && t.isi[0].sesi_asal_nomor
+                    ? t.isi[0].sesi_asal_nomor
+                    : (isTerpakai ? 'Adonan WIP / Murni Fisik' : null)
+
+                const namaProduk = isTerpakai
+                    ? t.isi.map(i => i.nama_bahan).join(' + ')
+                    : ''
+
+                return {
+                    ...t,
+                    status: isTerpakai ? 'TERPAKAI' : 'KOSONG',
+                    sesi_nomor: sesiNomor,
+                    nama_produk: namaProduk
+                }
+            })
         } catch (err) {
-            error.value = 'Gagal memuat data tangki.'
+            error.value = bacaError(err, 'Gagal memuat status tangki.')
         } finally {
             isLoading.value = false
         }
     }
 
-    /**
-     * Catat hasil packaging — menutup sesi.
-     * @param {number} sesiId
-     * @param {number} hasil_qty        hasil jadi (uom_hasil sesi)
-     * @param {Array}  kemasan          [{nama, jumlah}]
-     * @param {string} catatan
-     */
-    const catatPackaging = async (sesiId, { hasil_qty, kemasan, catatan = '' }) => {
-        const isiKemasan = (kemasan ?? []).filter(k => k.nama?.trim() && Number(k.jumlah) > 0)
-        if (!Number(hasil_qty) || Number(hasil_qty) <= 0) {
-            return { success: false, message: 'Hasil jadi harus lebih dari 0.' }
-        }
-        if (!isiKemasan.length) {
-            return { success: false, message: 'Minimal satu kemasan dengan jumlah di atas 0.' }
-        }
-
-        sedangSimpan.value = true
-        try {
-
-            await api.post(`produksi/sesi/${sesiId}/packaging/`, {
-              hasil_qty, kemasan: isiKemasan, catatan,
-            })
-            await Promise.all([muatSesi(), muatTanki()])
-            return { success: true }
-        } catch (err) {
-            return { success: false, message: bacaError(err, 'Gagal mencatat packaging.') }
-        } finally {
-            sedangSimpan.value = false
-        }
-    }
-
-    const tampil = computed(() => {
-        if (saringStatus.value === 'semua') return daftarSesi.value
-        return daftarSesi.value.filter(
-            s => s.status === saringStatus.value.toUpperCase(),
-        )
-    })
-
-    const berjalan = computed(() =>
-        daftarSesi.value.filter(s => s.status === 'BERJALAN'),
-    )
-    const dijadwalkan = computed(() =>
-        daftarSesi.value.filter(s => s.status === 'DIJADWALKAN'),
-    )
-    const selesaiBulanIni = computed(() => {
-        const kini = new Date()
-        return daftarSesi.value.filter(s => {
-            if (s.status !== 'SELESAI' || !s.selesai_pada) return false
-            const d = new Date(s.selesai_pada)
-            return d.getMonth() === kini.getMonth() && d.getFullYear() === kini.getFullYear()
-        })
-    })
-
     return {
-        daftarSesi, daftarTanki, tampil,
-        isLoading, sedangSimpan, error, saringStatus,
-        berjalan, dijadwalkan, selesaiBulanIni,
-        muatSesi, muatTanki, catatPackaging,
+        isLoading,
+        isMenyimpan,
+        error,
+        tankiList,
+        tankiTujuanList,
+        bahanList,
+        daftarTanki,
+        muatReferensi,
+        simpanPemakaianBahan,
+        muatTanki
     }
 }

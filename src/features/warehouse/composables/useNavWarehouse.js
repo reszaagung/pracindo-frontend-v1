@@ -1,8 +1,10 @@
 /**
  * src/features/warehouse/composables/useNavWarehouse.js
  * =====================================================
- * Menu rel ikon untuk WarehouseLayout.
+ * Konfigurasi menu sidebar untuk Ruang Kerja Gudang.
+ * Difokuskan murni pada 4 operasi utama gudang.
  */
+
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
@@ -10,71 +12,72 @@ import { ROLE } from '@/config/modules'
 
 export const MENU_WAREHOUSE = [
     {
-        id: 'stok',
-        label: 'Dashboard Stok',
-        ringkas: 'Pantau ketersediaan barang',
+        id: 'wh-packaging',
+        label: 'Packaging',
+        ringkas: 'Pengemasan barang jadi',
         ikon: 'pi-box',
-        rute: '/warehouse',
-        roles: [ROLE.GUDANG],
+        rute: '/warehouse/packaging',
+        roles: [ROLE.GUDANG, ROLE.PRODUKSI],
         activate: true,
     },
     {
-        id: 'saldo-raw',
-        label: 'Saldo Entitas',
-        ringkas: 'Pantau kepemilikan dan hutang bahan',
-        ikon: 'pi-list',
-        rute: '/warehouse/saldo',
-        roles: [ROLE.GUDANG],
-        activate: true,
-    },
-    {
-        id: 'inbound',
-        label: 'Penerimaan',
-        ringkas: 'Terima bahan dari suplier (Inbound)',
+        id: 'wh-received',
+        label: 'Received',
+        ringkas: 'Penerimaan barang',
         ikon: 'pi-download',
-        rute: '/warehouse/inbound',
+        rute: '/warehouse/received',
         roles: [ROLE.GUDANG],
         activate: true,
     },
     {
-        id: 'outbound',
-        label: 'Pengepakan',
-        ringkas: 'Siapkan pesanan & produksi (Outbound)',
-        ikon: 'pi-upload',
-        rute: '/warehouse/outbound',
+        id: 'wh-received-package',
+        label: 'Received Package',
+        ringkas: 'Penerimaan kemasan',
+        ikon: 'pi-check-square',
+        rute: '/warehouse/received-package',
         roles: [ROLE.GUDANG],
         activate: true,
     },
     {
-        id: 'opname',
-        label: 'Stok Opname',
-        ringkas: 'Penyesuaian fisik vs sistem',
-        ikon: 'pi-clipboard',
-        rute: '/warehouse/opname',
+        id: 'wh-retur',
+        label: 'Retur',
+        ringkas: 'Pengembalian barang',
+        ikon: 'pi-sync',
+        rute: '/warehouse/retur',
         roles: [ROLE.GUDANG],
         activate: true,
-    },
+    }
 ]
 
 export function useNavWarehouse() {
     const route = useRoute()
     const { role, isSupervisor } = useAuth()
 
+    /**
+     * Filter menu berdasarkan hak akses pengguna yang sedang login.
+     */
     const menu = computed(() =>
         MENU_WAREHOUSE.filter(m =>
-            isSupervisor.value || !m.roles?.length || m.roles.includes(role.value),
-        ),
+            isSupervisor.value || !m.roles?.length || m.roles.includes(role.value)
+        )
     )
 
-    const aktif = (rute) => {
-
-        if (rute === '/warehouse') {
-            return route.path === '/warehouse'
-        }
-        return route.path.startsWith(rute)
+    /**
+     * Logika agar menu sidebar menyala sesuai URL saat ini.
+     * Menggunakan exact match atau sub-path match untuk mencegah false positive.
+     */
+    const aktif = (item_rute) => {
+        return route.path === item_rute || route.path.startsWith(`${item_rute}/`)
     }
 
+    /**
+     * Mengambil data item menu yang sedang aktif saat ini.
+     */
     const sekarang = computed(() => MENU_WAREHOUSE.find(m => aktif(m.rute)) ?? null)
 
-    return { menu, aktif, sekarang }
+    return {
+        menu,
+        aktif,
+        sekarang
+    }
 }

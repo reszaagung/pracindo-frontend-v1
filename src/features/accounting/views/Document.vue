@@ -1,234 +1,8 @@
-<!--
-  src/features/accounting/views/Document.vue
-  ==========================================
-  Kontrol dokumen PO — ruang PENINJAUAN (rel Buku Tagihan). Tiga berkas
-  wajib per PO: Invoice, Faktur Pajak, Surat Jalan. Dokumen nyata disimpan
-  di app `dokumen` (Lampiran, append-only) dan dirakit jadi baris audit di
-  useDocument.
-
-  Konvensi mengikuti BukuTagihan.vue: token tema.css (bukan warna Tailwind
-  mentah), komponen StatCard/EmptyState/LoadingBar, umpan balik inline
-  (bukan alert). Backend append-only -> tidak ada aksi hapus; salah unggah
-  diperbaiki dengan mengunggah revisi baru.
--->
-<template>
-    <div>
-        <header class="kepala">
-            <div>
-                <p class="remah">
-                    <router-link to="/">Dashboard</router-link> ›
-                    <router-link to="/accounting/tagihan">Buku Tagihan</router-link> › Dokumen
-                </p>
-                <h1 class="judul">Dokumen</h1>
-                <p class="sub">Kelengkapan berkas legal penagihan & pengiriman per purchase order.</p>
-            </div>
-            <button class="tbl tbl--utama" @click="bukaUploadKosong">
-                <i class="pi pi-cloud-upload"></i> Upload dokumen
-            </button>
-        </header>
-
-        <section class="metrik">
-            <StatCard label="Total PO" :nilai="totalTransactions" kaki="Dipindai kelengkapannya" />
-            <StatCard label="Lengkap" :nilai="fullyCompliantCount" kaki="3 dari 3 berkas" />
-            <StatCard label="Menunggu berkas" :nilai="missingDocsCount" kaki="Belum lengkap"
-                :waspada="missingDocsCount > 0" />
-        </section>
-
-        <section class="panel">
-            <div class="panel__kepala">
-                <div>
-                    <h2 class="panel__judul">Kontrol dokumen</h2>
-                    <p class="panel__sub">Unggah invoice, faktur pajak, dan surat jalan per PO</p>
-                </div>
-                <div class="alat">
-                    <div class="tab" role="tablist">
-                        <button v-for="t in tabs" :key="t.id" :class="{ on: statusFilter === t.id }" role="tab"
-                            :aria-selected="statusFilter === t.id" @click="statusFilter = t.id">{{ t.label }}</button>
-                    </div>
-                    <div class="cari">
-                        <i class="pi pi-search"></i>
-                        <input v-model="searchQuery" type="text" placeholder="Cari No. PO / supplier…" />
-                    </div>
-                </div>
-            </div>
-
-            <LoadingBar v-if="isLoading" pesan="Membaca data dokumen" />
-
-            <p v-else-if="error" class="galat">{{ error }}</p>
-
-            <div v-else-if="filteredAuditData.length">
-                <div v-for="item in filteredAuditData" :key="item.id" class="baris">
-                    <div class="baris__ref">
-                        <p class="baris__nomor">{{ item.po_id }}</p>
-                        <p class="baris__pihak">{{ item.partner }}</p>
-                    </div>
-
-                    <div class="berkas">
-                        <div v-for="w in WAJIB" :key="w.key" class="berkas__sel">
-                            <span class="stensil berkas__label">{{ w.label }}</span>
-                            <span v-if="item.files[w.key].exists" class="chip chip--ada"
-                                :title="`${item.files[w.key].oleh} · ${tgl(item.files[w.key].pada)}`">
-                                <i class="pi pi-check"></i> {{ item.files[w.key].doc_no }}
-                            </span>
-                            <button v-else class="chip chip--upload" @click="bukaUpload(item, w.label)">
-                                <i class="pi pi-cloud-upload"></i> Upload
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="audit">
-                        <span class="lencana" :class="stat(item).isComplete ? 'lencana--ok' : 'lencana--pending'">
-                            {{ stat(item).isComplete ? 'LENGKAP' : 'PENDING' }}
-                        </span>
-                        <div class="bar">
-                            <div class="bar__isi" :class="stat(item).isComplete ? 'bar__isi--ok' : 'bar__isi--pending'"
-                                :style="{ width: stat(item).percentage + '%' }"></div>
-                        </div>
-                    </div>
-
-                    <span class="terima"
-                        :class="`terima--${(item.status_penerimaan || 'belum_diterima').toLowerCase()}`">
-                        {{ labelTerima(item.status_penerimaan) }}
-                    </span>
-
-                    <span class="bayar" :class="`bayar--${(item.payment_status || 'unpaid').toLowerCase()}`">
-                        {{ labelBayar(item.payment_status) }}
-                    </span>
-
-                    <button class="lihat" @click="bukaDetail(item)" title="Lihat detail">
-                        <i class="pi pi-eye"></i>
-                    </button>
-                </div>
-            </div>
-
-            <EmptyState v-else pesan="Belum ada PO untuk ditinjau." petunjuk="PO yang dibuat akan muncul di sini." />
-        </section>
-
-        <!-- ── Modal upload ─────────────────────────────────────── -->
-        <div v-if="showUpload" class="tirai" @click.self="showUpload = false">
-            <div class="kotak">
-                <div class="kotak__kepala">
-                    <h3>Upload berkas pendukung</h3>
-                    <button class="x" @click="showUpload = false"><i class="pi pi-times"></i></button>
-                </div>
-
-                <div class="kotak__isi">
-                    <label class="bidang">
-                        <span class="stensil">Referensi PO</span>
-                        <input :value="uploadForm.po_reference || '—'" readonly class="baca" />
-                    </label>
-
-                    <div class="dua">
-                        <label class="bidang">
-                            <span class="stensil">Jenis dokumen</span>
-                            <select v-model="uploadForm.document_type">
-                                <option value="Invoice">Invoice</option>
-                                <option value="Faktur Pajak">Faktur Pajak</option>
-                                <option value="Surat Jalan">Surat Jalan</option>
-                            </select>
-                        </label>
-                        <label class="bidang">
-                            <span class="stensil">Nomor dokumen</span>
-                            <input v-model="uploadForm.document_number" type="text" placeholder="No. seri berkas…" />
-                        </label>
-                    </div>
-
-                    <label class="bidang">
-                        <span class="stensil">Berkas <em>(wajib)</em></span>
-                        <input type="file" @change="setFile($event.target.files)" accept=".pdf,.jpg,.jpeg,.png,.webp" />
-                        <span v-if="uploadForm.file" class="berkas__nama">{{ uploadForm.file.name }}</span>
-                    </label>
-
-                    <p v-if="pesanModal" class="galat galat--modal">{{ pesanModal }}</p>
-                </div>
-
-                <div class="kotak__kaki">
-                    <button class="tbl" @click="showUpload = false">Batal</button>
-                    <button class="tbl tbl--utama" :disabled="sedangSimpan" @click="submitUpload">
-                        {{ sedangSimpan ? 'Mengarsipkan…' : 'Arsipkan dokumen' }}
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- ── Modal detail ─────────────────────────────────────── -->
-        <div v-if="showDetail && terpilih" class="tirai" @click.self="showDetail = false">
-            <div class="kotak kotak--lebar">
-                <div class="kotak__kepala">
-                    <h3>Detail dokumen — {{ terpilih.po_id }}</h3>
-                    <button class="x" @click="showDetail = false"><i class="pi pi-times"></i></button>
-                </div>
-
-                <div class="kotak__isi detail">
-                    <div class="detail__info">
-                        <div><span class="stensil">Rekanan</span>
-                            <p>{{ terpilih.partner }}</p>
-                        </div>
-                        <div><span class="stensil">Tanggal</span>
-                            <p>{{ tgl(terpilih.date) }}</p>
-                        </div>
-                        <div><span class="stensil">Penerimaan Gudang</span>
-                            <p><span class="terima"
-                                    :class="`terima--${(terpilih.status_penerimaan || 'belum_diterima').toLowerCase()}`">{{
-                                        labelTerima(terpilih.status_penerimaan) }}</span></p>
-                        </div>
-                        <div><span class="stensil">Pembayaran</span>
-                            <p><span class="bayar"
-                                    :class="`bayar--${(terpilih.payment_status || 'unpaid').toLowerCase()}`">{{
-                                        labelBayar(terpilih.payment_status) }}</span></p>
-                        </div>
-                        <div class="detail__prog">
-                            <div class="detail__prog-kepala">
-                                <span :class="stat(terpilih).isComplete ? 'ok' : 'pending'">
-                                    {{ stat(terpilih).isComplete ? 'Lengkap 100%' : 'Belum lengkap' }}
-                                </span>
-                                <span class="redup">{{ stat(terpilih).count }} / 3 berkas</span>
-                            </div>
-                            <div class="bar">
-                                <div class="bar__isi"
-                                    :class="stat(terpilih).isComplete ? 'bar__isi--ok' : 'bar__isi--pending'"
-                                    :style="{ width: stat(terpilih).percentage + '%' }"></div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="detail__berkas">
-                        <span class="stensil">Kelengkapan berkas</span>
-                        <div v-for="w in WAJIB" :key="w.key" class="fbaris">
-                            <div>
-                                <p class="fbaris__judul">{{ w.label }}</p>
-                                <span v-if="terpilih.files[w.key].exists" class="chip chip--ada">{{
-                                    terpilih.files[w.key].doc_no }}</span>
-                                <span v-else class="chip chip--kosong">Belum ada</span>
-                            </div>
-                            <div class="fbaris__aksi">
-                                <a v-if="terpilih.files[w.key].exists" :href="terpilih.files[w.key].file"
-                                    target="_blank" rel="noopener" class="ikon ikon--unduh" title="Buka / unduh"><i
-                                        class="pi pi-download"></i></a>
-                                <button class="ikon ikon--upload"
-                                    :title="terpilih.files[w.key].exists ? 'Unggah revisi' : 'Unggah'"
-                                    @click="bukaUpload(terpilih, w.label)"><i class="pi pi-cloud-upload"></i></button>
-                            </div>
-                        </div>
-                        <p class="nota">Dokumen bersifat append-only — mengunggah ulang membuat revisi baru, versi lama
-                            tetap tersimpan sebagai jejak audit.</p>
-                    </div>
-                </div>
-
-                <div class="kotak__kaki">
-                    <button class="tbl" @click="showDetail = false">Tutup</button>
-                </div>
-            </div>
-        </div>
-    </div>
-</template>
-
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useDocument } from '@/features/accounting/composables/useDocument'
-import StatCard from '@/components/ui/StatCard.vue'
-import EmptyState from '@/components/ui/EmptyState.vue'
 import LoadingBar from '@/components/ui/LoadingBar.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 
 const {
     isLoading, sedangSimpan, error,
@@ -239,701 +13,483 @@ const {
 
 onMounted(muat)
 
-const tabs = [
-    { id: 'all', label: 'Semua' },
-    { id: 'lengkap', label: 'Lengkap' },
-    { id: 'tidak_lengkap', label: 'Pending' },
-]
-
-const showUpload = ref(false)
-const showDetail = ref(false)
-const terpilih = ref(null)
+const showUploadModal = ref(false)
+const showDetailModal = ref(false)
+const selectedAuditItem = ref(null)
 const pesanModal = ref('')
 
-const stat = (item) => getComplianceStats(item.files)
+const getPaymentBadge = (status) => {
+    const s = String(status || 'UNPAID').toUpperCase()
+    if (s === 'PAID') return 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+    if (s === 'PARTIAL') return 'bg-blue-100 text-blue-700 border border-blue-200'
+    return 'bg-amber-100 text-amber-700 border border-amber-200'
+}
 
-const bukaUpload = (item, docLabel) => {
-    siapkanUpload(item, docLabel)
+const openDetailModal = (item) => {
+    selectedAuditItem.value = item
+    showDetailModal.value = true
+}
+
+const openUploadModalFor = (row, docType) => {
+    siapkanUpload(row, docType)
     pesanModal.value = ''
-    showDetail.value = false
-    showUpload.value = true
+    showDetailModal.value = false
+    showUploadModal.value = true
 }
 
 const bukaUploadKosong = () => {
     siapkanUpload({ id: null, po_id: '', partner: '' }, 'Invoice')
     pesanModal.value = 'Buka dari baris PO agar referensi terisi otomatis.'
-    showUpload.value = true
+    showUploadModal.value = true
 }
 
 const submitUpload = async () => {
     const r = await handleUploadDocument()
     if (r.success) {
-        showUpload.value = false
+        showUploadModal.value = false
         pesanModal.value = ''
     } else {
         pesanModal.value = r.message
     }
 }
-
-const bukaDetail = (item) => {
-    terpilih.value = item
-    showDetail.value = true
-}
-
-const labelBayar = (s) => ({ PAID: 'Lunas', PARTIAL: 'Sebagian', UNPAID: 'Belum bayar' }[s] || '—')
-const labelTerima = (s) => ({ PENUH: 'Diterima Penuh', SEBAGIAN: 'Sebagian', BELUM_DITERIMA: 'Belum Diterima' }[s] || 'Belum Diterima')
-
-const tgl = (iso) => {
-    if (!iso) return '—'
-    return new Date(iso).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
-}
 </script>
 
+<template>
+    <div class="space-y-4 md:space-y-6 animate-fade-in text-slate-700 w-full overflow-hidden">
+
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+                <p class="text-xs text-slate-400 mb-1">
+                    <router-link to="/" class="hover:text-slate-600">Dashboard</router-link> ›
+                    <router-link to="/accounting/tagihan" class="hover:text-slate-600">Buku Tagihan</router-link> ›
+                    Dokumen
+                </p>
+                <h2 class="text-xl md:text-2xl font-bold text-slate-800 tracking-tight">Document Control & Audit</h2>
+                <p class="text-slate-500 text-xs md:text-sm mt-1">Monitoring kelengkapan berkas legal pengiriman dan
+                    penagihan.</p>
+            </div>
+
+            <button @click="bukaUploadKosong"
+                class="w-full sm:w-auto justify-center px-5 py-3 md:py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl shadow-md transition-all flex items-center gap-2">
+                <i class="pi pi-cloud-upload text-base"></i>
+                <span>Upload Dokumen Baru</span>
+            </button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5">
+            <div class="bg-white border border-slate-200 rounded-[20px] p-4 md:p-5 flex items-center gap-4 shadow-sm">
+                <div
+                    class="w-11 h-11 bg-slate-50 text-slate-600 rounded-xl flex items-center justify-center shrink-0 border border-slate-100">
+                    <i class="pi pi-folder text-lg"></i>
+                </div>
+                <div>
+                    <p class="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider">Total Transaksi
+                    </p>
+                    <h3 class="text-lg md:text-xl font-black text-slate-800 mt-0.5">{{ totalTransactions }} Rute</h3>
+                </div>
+            </div>
+
+            <div class="bg-white border border-slate-200 rounded-[20px] p-4 md:p-5 flex items-center gap-4 shadow-sm">
+                <div
+                    class="w-11 h-11 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center shrink-0 border border-emerald-100">
+                    <i class="pi pi-verified text-lg"></i>
+                </div>
+                <div>
+                    <p class="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider">Audit Pass</p>
+                    <h3 class="text-lg md:text-xl font-black text-emerald-600 mt-0.5">{{ fullyCompliantCount }} Lengkap
+                    </h3>
+                </div>
+            </div>
+
+            <div class="bg-white border border-slate-200 rounded-[20px] p-4 md:p-5 flex items-center gap-4 shadow-sm">
+                <div
+                    class="w-11 h-11 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center shrink-0 border border-amber-100">
+                    <i class="pi pi-exclamation-triangle text-lg"></i>
+                </div>
+                <div>
+                    <p class="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider">Missing Docs</p>
+                    <h3 class="text-lg md:text-xl font-black text-amber-600 mt-0.5">{{ missingDocsCount }} Pending</h3>
+                </div>
+            </div>
+        </div>
+
+        <div
+            class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white p-3 md:p-4 border border-slate-200 rounded-2xl shadow-sm">
+            <div
+                class="flex bg-slate-100 p-1 rounded-xl w-full lg:w-auto overflow-x-auto custom-scrollbar no-scrollbar-mobile">
+                <button @click="statusFilter = 'all'"
+                    :class="statusFilter === 'all' ? 'bg-white text-slate-900 shadow-sm font-bold' : 'text-slate-500 hover:text-slate-800'"
+                    class="px-4 py-2 text-xs rounded-lg transition-all whitespace-nowrap flex-1 lg:flex-none text-center">Semua
+                    Berkas</button>
+                <button @click="statusFilter = 'lengkap'"
+                    :class="statusFilter === 'lengkap' ? 'bg-white text-emerald-600 shadow-sm font-bold' : 'text-slate-500 hover:text-slate-800'"
+                    class="px-4 py-2 text-xs rounded-lg transition-all whitespace-nowrap flex-1 lg:flex-none text-center">Lengkap</button>
+                <button @click="statusFilter = 'tidak_lengkap'"
+                    :class="statusFilter === 'tidak_lengkap' ? 'bg-white text-amber-600 shadow-sm font-bold' : 'text-slate-500 hover:text-slate-800'"
+                    class="px-4 py-2 text-xs rounded-lg transition-all whitespace-nowrap flex-1 lg:flex-none text-center">Pending</button>
+            </div>
+
+            <div class="relative w-full lg:w-72">
+                <i class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                <input type="text" v-model="searchQuery" placeholder="Cari No. PO / Supplier..."
+                    class="w-full pl-9 pr-4 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-700" />
+            </div>
+        </div>
+
+        <LoadingBar v-if="isLoading" pesan="Membaca data dokumen" />
+        <p v-else-if="error" class="p-4 text-sm text-red-600 bg-red-50 rounded-xl border border-red-200">{{ error }}</p>
+
+        <div v-else-if="filteredAuditData.length" class="w-full">
+            <table class="w-full text-left text-sm border-collapse">
+                <thead
+                    class="hidden md:table-header-group bg-slate-50 text-slate-500 border border-slate-200 rounded-t-2xl">
+                    <tr>
+                        <th class="py-4 px-6 font-semibold rounded-tl-2xl">Referensi Transaksi</th>
+                        <th class="py-4 px-4 font-semibold text-center">1. Invoice</th>
+                        <th class="py-4 px-4 font-semibold text-center">2. Faktur Pajak</th>
+                        <th class="py-4 px-4 font-semibold text-center">3. Surat Jalan</th>
+                        <th class="py-4 px-6 font-semibold text-center">Status Audit</th>
+                        <th class="py-4 px-4 font-semibold text-center">Pembayaran</th>
+                        <th class="py-4 px-4 font-semibold text-center rounded-tr-2xl">Aksi</th>
+                    </tr>
+                </thead>
+
+                <tbody
+                    class="block md:table-row-group bg-transparent md:bg-white md:border md:border-t-0 md:border-slate-200 rounded-b-2xl">
+                    <tr v-for="item in filteredAuditData" :key="item.id"
+                        class="block md:table-row bg-white border border-slate-200 md:border-b md:border-x-0 md:border-t-0 md:border-slate-100 hover:bg-slate-50/40 transition-colors rounded-2xl md:rounded-none mb-4 md:mb-0 p-4 md:p-0 shadow-sm md:shadow-none relative">
+
+                        <td
+                            class="block md:table-cell md:py-4 md:px-6 mb-4 md:mb-0 border-b border-slate-50 md:border-none pb-3 md:pb-0">
+                            <span
+                                class="md:hidden text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Referensi
+                                Transaksi</span>
+                            <span class="font-bold text-slate-900 block text-base">{{ item.po_id }}</span>
+                            <span class="text-xs font-medium text-slate-500 block mt-0.5">{{ item.partner }}</span>
+                        </td>
+
+                        <!-- INVOICE -->
+                        <td
+                            class="flex justify-between items-center md:table-cell md:py-4 md:px-4 md:text-center border-b border-slate-50 md:border-none py-2 md:py-0 mb-2 md:mb-0">
+                            <span class="md:hidden text-xs font-bold text-slate-500">1. Invoice</span>
+                            <div v-if="item.files.invoice?.exists"
+                                class="inline-flex flex-col items-center bg-emerald-50/60 border border-emerald-100 px-3 py-1.5 rounded-xl">
+                                <span class="text-xs font-bold text-emerald-700 flex items-center gap-1"><i
+                                        class="pi pi-check text-[10px]"></i> Tersedia</span>
+                                <span
+                                    class="hidden md:block text-[9px] text-emerald-600 font-medium mt-0.5 max-w-[80px] truncate"
+                                    :title="item.files.invoice.doc_no">{{ item.files.invoice.doc_no }}</span>
+                            </div>
+                            <button v-else @click="openUploadModalFor(item, 'Invoice')"
+                                class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 text-slate-500 hover:bg-emerald-50 hover:text-emerald-600 border border-slate-200 rounded-xl text-xs font-bold tracking-wide transition-colors">
+                                <i class="pi pi-cloud-upload text-[10px]"></i> Upload
+                            </button>
+                        </td>
+
+                        <!-- FAKTUR PAJAK -->
+                        <td
+                            class="flex justify-between items-center md:table-cell md:py-4 md:px-4 md:text-center border-b border-slate-50 md:border-none py-2 md:py-0 mb-2 md:mb-0">
+                            <span class="md:hidden text-xs font-bold text-slate-500">2. Faktur Pajak</span>
+                            <div v-if="item.files.faktur_pajak?.exists"
+                                class="inline-flex flex-col items-center bg-emerald-50/60 border border-emerald-100 px-3 py-1.5 rounded-xl">
+                                <span class="text-xs font-bold text-emerald-700 flex items-center gap-1"><i
+                                        class="pi pi-check text-[10px]"></i> Tersedia</span>
+                                <span
+                                    class="hidden md:block text-[9px] text-emerald-600 font-medium mt-0.5 max-w-[80px] truncate"
+                                    :title="item.files.faktur_pajak.doc_no">{{ item.files.faktur_pajak.doc_no }}</span>
+                            </div>
+                            <button v-else @click="openUploadModalFor(item, 'Faktur Pajak')"
+                                class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 text-slate-500 hover:bg-emerald-50 hover:text-emerald-600 border border-slate-200 rounded-xl text-xs font-bold tracking-wide transition-colors">
+                                <i class="pi pi-cloud-upload text-[10px]"></i> Upload
+                            </button>
+                        </td>
+
+                        <!-- SURAT JALAN -->
+                        <td
+                            class="flex justify-between items-center md:table-cell md:py-4 md:px-4 md:text-center border-b border-slate-50 md:border-none py-2 md:py-0 mb-4 md:mb-0">
+                            <span class="md:hidden text-xs font-bold text-slate-500">3. Surat Jalan</span>
+                            <div v-if="item.files.surat_jalan?.exists"
+                                class="inline-flex flex-col items-center bg-emerald-50/60 border border-emerald-100 px-3 py-1.5 rounded-xl">
+                                <span class="text-xs font-bold text-emerald-700 flex items-center gap-1"><i
+                                        class="pi pi-check text-[10px]"></i> Tersedia</span>
+                                <span
+                                    class="hidden md:block text-[9px] text-emerald-600 font-medium mt-0.5 max-w-[80px] truncate"
+                                    :title="item.files.surat_jalan.doc_no">{{ item.files.surat_jalan.doc_no }}</span>
+                            </div>
+                            <button v-else @click="openUploadModalFor(item, 'Surat Jalan')"
+                                class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 text-slate-500 hover:bg-emerald-50 hover:text-emerald-600 border border-slate-200 rounded-xl text-xs font-bold tracking-wide transition-colors">
+                                <i class="pi pi-cloud-upload text-[10px]"></i> Upload
+                            </button>
+                        </td>
+
+                        <!-- STATUS AUDIT -->
+                        <td class="block md:table-cell md:py-4 md:px-6 md:text-center mb-3 md:mb-0">
+                            <span class="md:hidden text-xs font-bold text-slate-500 mb-2 block">Progress Audit</span>
+                            <div
+                                class="flex md:flex-col items-center justify-between md:justify-center gap-2 md:gap-1.5">
+                                <span
+                                    :class="getComplianceStats(item.files).isComplete ? 'bg-emerald-600 text-white' : 'bg-amber-100 text-amber-700'"
+                                    class="px-3 py-1 rounded-full text-[10px] md:text-xs font-bold tracking-wide">
+                                    {{ getComplianceStats(item.files).isComplete ? 'PASSED' : 'INCOMPLETE' }}
+                                </span>
+                                <div
+                                    class="w-1/2 md:w-20 bg-slate-100 h-1.5 rounded-full overflow-hidden border border-slate-200">
+                                    <div :class="getComplianceStats(item.files).isComplete ? 'bg-emerald-500' : 'bg-amber-500'"
+                                        :style="{ width: getComplianceStats(item.files).percentage + '%' }"
+                                        class="h-full transition-all"></div>
+                                </div>
+                                <span class="text-[10px] text-slate-400 font-bold hidden md:inline-block">{{
+                                    getComplianceStats(item.files).percentage }}% Lengkap</span>
+                            </div>
+                        </td>
+
+                        <!-- PEMBAYARAN -->
+                        <td
+                            class="flex justify-between items-center md:table-cell md:py-4 md:px-4 md:text-center mb-4 md:mb-0">
+                            <span class="md:hidden text-xs font-bold text-slate-500">Status Pembayaran</span>
+                            <span :class="getPaymentBadge(item.payment_status)"
+                                class="px-3 py-1.5 rounded-lg text-[10px] font-extrabold uppercase tracking-wider inline-block min-w-[80px] text-center">
+                                {{ item.payment_status || 'UNPAID' }}
+                            </span>
+                        </td>
+
+                        <!-- AKSI -->
+                        <td class="block md:table-cell p-0 md:py-4 md:px-4 md:text-center mt-2 md:mt-0">
+                            <button @click="openDetailModal(item)"
+                                class="w-full md:w-9 h-11 md:h-9 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white border border-blue-100 transition-colors inline-flex items-center justify-center shadow-sm gap-2">
+                                <i class="pi pi-eye text-sm md:text-base"></i>
+                                <span class="md:hidden text-sm font-bold">Lihat Detail Transaksi</span>
+                            </button>
+                        </td>
+
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <EmptyState v-else pesan="Belum ada tagihan untuk diaudit."
+            petunjuk="PO yang sudah diterima gudang akan muncul di sini." />
+
+        <!-- MODAL UPLOAD -->
+        <div v-if="showUploadModal"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4"
+            @click.self="showUploadModal = false">
+            <div
+                class="bg-white w-full max-w-md max-h-[95vh] overflow-y-auto rounded-[24px] shadow-2xl flex flex-col animate-fade-in-up">
+                <div
+                    class="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 sticky top-0 z-10">
+                    <h3 class="text-sm md:text-base font-bold text-slate-800">Upload Berkas Pendukung</h3>
+                    <button @click="showUploadModal = false"
+                        class="text-slate-400 hover:text-red-500 transition-colors"><i
+                            class="pi pi-times text-lg"></i></button>
+                </div>
+
+                <div class="p-5 space-y-4">
+                    <div v-if="pesanModal" class="p-3 text-xs font-medium"
+                        :class="pesanModal.includes('berhasil') ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'">
+                        {{ pesanModal }}
+                    </div>
+
+                    <div class="flex flex-col gap-1.5">
+                        <label class="text-xs font-bold text-slate-500">REFERENSI NO. PO / ID</label>
+                        <input type="text" :value="uploadForm.po_reference" readonly
+                            class="w-full px-4 py-3 md:py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-sm text-slate-500 font-medium uppercase" />
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-xs font-bold text-slate-500">JENIS DOKUMEN</label>
+                            <select v-model="uploadForm.document_type"
+                                class="w-full px-4 py-3 md:py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 text-slate-800">
+                                <option value="Invoice">1. Invoice</option>
+                                <option value="Faktur Pajak">2. Faktur Pajak</option>
+                                <option value="Surat Jalan">3. Surat Jalan</option>
+                            </select>
+                        </div>
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-xs font-bold text-slate-500">NOMOR DOKUMEN</label>
+                            <input type="text" v-model="uploadForm.document_number" placeholder="No. Seri Berkas..."
+                                class="w-full px-4 py-3 md:py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 text-slate-800" />
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col gap-1.5">
+                        <label class="text-xs font-bold text-slate-500">BERKAS FISIK (PDF/IMG)</label>
+                        <input type="file" @change="setFile($event.target.files)" accept=".pdf,.jpg,.jpeg,.png,.webp"
+                            class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer" />
+                    </div>
+                </div>
+
+                <div class="px-5 py-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50/50 sticky bottom-0">
+                    <button @click="showUploadModal = false"
+                        class="flex-1 md:flex-none px-4 py-3 md:py-2 text-sm md:text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50">Batal</button>
+                    <button @click="submitUpload" :disabled="sedangSimpan"
+                        class="flex-1 md:flex-none px-4 py-3 md:py-2 text-sm md:text-xs font-bold text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 shadow-md disabled:opacity-60 flex justify-center items-center gap-2">
+                        <i v-if="sedangSimpan" class="pi pi-spin pi-spinner"></i>
+                        {{ sedangSimpan ? 'Mengunggah...' : 'Arsipkan Dokumen' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL DETAIL & AUDIT -->
+        <div v-if="showDetailModal && selectedAuditItem"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4"
+            @click.self="showDetailModal = false">
+            <div
+                class="bg-white w-full max-w-3xl max-h-[95vh] overflow-y-auto rounded-[24px] shadow-2xl flex flex-col animate-fade-in-up">
+
+                <div
+                    class="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 sticky top-0 z-10">
+                    <h3 class="text-sm md:text-base font-bold text-slate-800">Detail Transaksi Audit</h3>
+                    <button @click="showDetailModal = false"
+                        class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:text-red-500 transition-colors flex items-center justify-center"><i
+                            class="pi pi-times text-sm"></i></button>
+                </div>
+
+                <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-6 bg-white">
+                    <div>
+                        <h4 class="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2"><i
+                                class="pi pi-info-circle text-emerald-500"></i> Informasi Transaksi</h4>
+                        <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-4">
+                            <div>
+                                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">REFERENSI
+                                    PO</p>
+                                <p class="text-base md:text-lg font-black text-slate-800">{{ selectedAuditItem.po_id }}
+                                </p>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                                        TANGGAL</p>
+                                    <p class="text-xs md:text-sm font-bold text-slate-700">{{ selectedAuditItem.date ||
+                                        '-' }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                                        REKANAN</p>
+                                    <p class="text-xs md:text-sm font-bold text-slate-700">{{ selectedAuditItem.partner
+                                    }}</p>
+                                </div>
+                            </div>
+                            <div class="pt-3 border-t border-slate-200">
+                                <div class="flex items-center justify-between mb-1.5">
+                                    <span class="text-[11px] md:text-xs font-bold"
+                                        :class="getComplianceStats(selectedAuditItem.files).isComplete ? 'text-emerald-600' : 'text-amber-600'">
+                                        {{ getComplianceStats(selectedAuditItem.files).isComplete ? 'Lengkap 100%' :
+                                            'Belum Lengkap' }}
+                                    </span>
+                                    <span class="text-[10px] md:text-xs font-bold text-slate-500">{{
+                                        getComplianceStats(selectedAuditItem.files).count }} / 3 Berkas</span>
+                                </div>
+                                <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                                    <div :class="getComplianceStats(selectedAuditItem.files).isComplete ? 'bg-emerald-500' : 'bg-amber-500'"
+                                        :style="{ width: getComplianceStats(selectedAuditItem.files).percentage + '%' }"
+                                        class="h-full transition-all duration-500"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h4 class="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2"><i
+                                class="pi pi-folder-open text-emerald-500"></i> Kelengkapan Berkas</h4>
+                        <div class="space-y-3">
+                            <div v-for="w in WAJIB" :key="w.key"
+                                class="bg-white border border-slate-200 rounded-xl p-3 flex items-center justify-between shadow-sm">
+                                <div>
+                                    <p class="text-xs font-bold text-slate-800 mb-1">{{ w.label }}</p>
+                                    <span v-if="selectedAuditItem.files[w.key]?.exists"
+                                        class="inline-block px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[10px] font-bold rounded border border-emerald-100 truncate max-w-[120px]"
+                                        :title="selectedAuditItem.files[w.key].doc_no">
+                                        {{ selectedAuditItem.files[w.key].doc_no }}
+                                    </span>
+                                    <span v-else
+                                        class="inline-block px-2 py-0.5 bg-red-50 text-red-600 text-[10px] font-bold rounded border border-red-100">Belum
+                                        Ada</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <a v-if="selectedAuditItem.files[w.key]?.exists"
+                                        :href="selectedAuditItem.files[w.key].file" target="_blank" rel="noopener"
+                                        class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-colors flex items-center justify-center border border-emerald-100"
+                                        title="Unduh / Lihat Berkas"><i class="pi pi-download text-xs"></i></a>
+
+                                    <button @click="openUploadModalFor(selectedAuditItem, w.label)"
+                                        class="w-8 h-8 rounded-lg bg-slate-50 text-slate-500 hover:bg-blue-600 hover:text-white border border-slate-200 transition-colors flex items-center justify-center"
+                                        :title="selectedAuditItem.files[w.key]?.exists ? 'Upload Revisi' : 'Upload Dokumen'"><i
+                                            class="pi pi-cloud-upload text-xs"></i></button>
+                                </div>
+                            </div>
+                            <p class="text-[10px] text-slate-400 leading-relaxed mt-2"><i
+                                    class="pi pi-info-circle text-[9px] mr-1"></i>Dokumen bersifat append-only.
+                                Mengunggah ulang akan membuat revisi baru; versi lama tetap tersimpan untuk audit.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="px-5 py-4 border-t border-slate-100 flex justify-end bg-slate-50/50 sticky bottom-0">
+                    <button @click="showDetailModal = false"
+                        class="w-full md:w-auto px-6 py-3 md:py-2.5 text-sm md:text-xs font-bold text-white bg-slate-800 rounded-xl hover:bg-slate-900 shadow-md">Tutup
+                        Panel</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</template>
+
 <style scoped>
-/* ── kepala ─────────────────────────────────────────────── */
-.kepala {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 2rem;
-    flex-wrap: wrap;
-    margin-bottom: 1.5rem;
+.animate-fade-in {
+    animation: fadeIn 0.4s ease-out;
 }
 
-.remah {
-    margin: 0 0 .3rem;
-    font-size: .75rem;
-    color: var(--redup-2);
+.animate-fade-in-up {
+    animation: fadeInUp 0.3s ease-out;
 }
 
-.remah a {
-    color: var(--redup);
-    text-decoration: none;
-}
-
-.remah a:hover {
-    color: var(--teks);
-    text-decoration: underline;
-}
-
-.judul {
-    margin: 0;
-    font-size: 1.625rem;
-    font-weight: 700;
-    letter-spacing: -.02em;
-}
-
-.sub {
-    margin: .3rem 0 0;
-    font-size: .8125rem;
-    color: var(--redup);
-}
-
-.tbl {
-    font-family: inherit;
-    font-size: .8125rem;
-    font-weight: 600;
-    color: var(--teks);
-    background: var(--panel);
-    border: 1px solid var(--garis);
-    border-radius: var(--lengkung-kecil);
-    padding: .6rem 1rem;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: .45rem;
-}
-
-.tbl:hover {
-    border-color: var(--garis-tegas);
-}
-
-.tbl--utama {
-    color: #fff;
-    background: var(--hijau);
-    border-color: var(--hijau);
-}
-
-.tbl--utama:hover {
-    filter: brightness(.95);
-}
-
-.tbl:disabled {
-    opacity: .6;
-    cursor: default;
-}
-
-/* ── metrik ─────────────────────────────────────────────── */
-.metrik {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-    gap: 1px;
-    background: var(--garis);
-    border: 1px solid var(--garis);
-    border-radius: var(--lengkung);
-    overflow: hidden;
-    margin-bottom: 1.5rem;
-}
-
-/* ── panel ──────────────────────────────────────────────── */
-.panel {
-    background: var(--panel);
-    border: 1px solid var(--garis);
-    border-radius: var(--lengkung);
-    overflow: hidden;
-}
-
-.panel__kepala {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 1rem;
-    flex-wrap: wrap;
-    padding: 1.1rem 1.25rem;
-    border-bottom: 1px solid var(--garis);
-}
-
-.panel__judul {
-    margin: 0;
-    font-size: .9375rem;
-    font-weight: 600;
-}
-
-.panel__sub {
-    margin: .15rem 0 0;
-    font-size: .75rem;
-    color: var(--redup);
-}
-
-.alat {
-    display: flex;
-    gap: .75rem;
-    align-items: center;
-    flex-wrap: wrap;
-}
-
-.tab {
-    display: flex;
-    gap: .2rem;
-    background: var(--latar);
-    padding: .2rem;
-    border-radius: 9px;
-}
-
-.tab button {
-    font-family: inherit;
-    font-size: .75rem;
-    font-weight: 600;
-    color: var(--redup);
-    background: none;
-    border: none;
-    padding: .4rem .8rem;
-    border-radius: 7px;
-    cursor: pointer;
-}
-
-.tab button.on {
-    background: var(--panel);
-    color: var(--teks);
-    box-shadow: var(--bayang);
-}
-
-.cari {
-    position: relative;
-}
-
-.cari .pi {
-    position: absolute;
-    left: .7rem;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--redup-2);
-    font-size: .8rem;
-}
-
-.cari input {
-    font-family: inherit;
-    font-size: .8125rem;
-    padding: .5rem .75rem .5rem 2rem;
-    background: var(--latar);
-    border: 1px solid var(--garis);
-    border-radius: var(--lengkung-kecil);
-    color: var(--teks);
-    width: 15rem;
-    max-width: 60vw;
-}
-
-.cari input:focus {
-    outline: none;
-    border-color: var(--biru);
-}
-
-/* ── baris audit ────────────────────────────────────────── */
-.baris {
-    display: grid;
-    /* [FIX] Menambahkan satu 'auto' agar ada ruang untuk lencana Penerimaan Gudang */
-    grid-template-columns: minmax(9rem, 1.1fr) minmax(0, 2.4fr) auto auto auto auto;
-    gap: 1rem;
-    align-items: center;
-    padding: 1rem 1.25rem;
-    border-bottom: 1px solid var(--latar);
-}
-
-.baris:last-child {
-    border-bottom: none;
-}
-
-.baris:hover {
-    background: var(--panel-hover);
-}
-
-.baris__nomor {
-    margin: 0 0 .2rem;
-    font-size: .8125rem;
-    font-weight: 600;
-}
-
-.baris__pihak {
-    margin: 0;
-    font-size: .75rem;
-    color: var(--redup);
-}
-
-.berkas {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: .5rem;
-}
-
-.berkas__sel {
-    display: flex;
-    flex-direction: column;
-    gap: .3rem;
-    align-items: flex-start;
-}
-
-.berkas__label {
-    color: var(--redup-2);
-}
-
-.chip {
-    display: inline-flex;
-    align-items: center;
-    gap: .35rem;
-    font-size: .75rem;
-    font-weight: 600;
-    padding: .35rem .6rem;
-    border-radius: var(--lengkung-kecil);
-    border: 1px solid transparent;
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.chip--ada {
-    color: var(--hijau);
-    background: var(--hijau-latar);
-    border-color: #A7F3D0;
-}
-
-.chip--kosong {
-    color: var(--merah);
-    background: var(--merah-latar);
-    border-color: #FECACA;
-}
-
-.chip--upload {
-    color: var(--redup);
-    background: var(--latar);
-    border-color: var(--garis);
-    cursor: pointer;
-    font-family: inherit;
-}
-
-.chip--upload:hover {
-    color: var(--hijau);
-    background: var(--hijau-latar);
-    border-color: #A7F3D0;
-}
-
-.audit {
-    display: flex;
-    flex-direction: column;
-    gap: .35rem;
-    align-items: center;
-    min-width: 5.5rem;
-}
-
-.lencana {
-    font-size: .625rem;
-    font-weight: 700;
-    letter-spacing: .05em;
-    padding: .2rem .55rem;
-    border-radius: 999px;
-}
-
-.lencana--ok {
-    color: #fff;
-    background: var(--hijau);
-}
-
-.lencana--pending {
-    color: var(--kuning);
-    background: var(--kuning-latar);
-}
-
-.bar {
-    width: 5rem;
-    height: 6px;
-    background: var(--garis);
-    border-radius: 3px;
-    overflow: hidden;
-}
-
-.bar__isi {
-    height: 100%;
-    transition: width .4s ease;
-}
-
-.bar__isi--ok {
-    background: var(--hijau);
-}
-
-.bar__isi--pending {
-    background: var(--kuning);
-}
-
-/* ── Status Penerimaan (Baru) ───────────────────────────── */
-.terima {
-    font-size: .625rem;
-    font-weight: 700;
-    letter-spacing: .04em;
-    text-transform: uppercase;
-    padding: .3rem .55rem;
-    border-radius: var(--lengkung-kecil);
-    text-align: center;
-    min-width: 6.5rem;
-}
-
-.terima--penuh {
-    color: var(--hijau);
-    background: var(--hijau-latar);
-}
-
-.terima--sebagian {
-    color: var(--biru);
-    background: var(--biru-latar);
-}
-
-.terima--belum_diterima {
-    color: var(--redup);
-    background: var(--latar);
-    border: 1px solid var(--garis);
-}
-
-.bayar {
-    font-size: .625rem;
-    font-weight: 700;
-    letter-spacing: .04em;
-    text-transform: uppercase;
-    padding: .3rem .55rem;
-    border-radius: var(--lengkung-kecil);
-    text-align: center;
-    min-width: 5rem;
-}
-
-.bayar--paid {
-    color: var(--hijau);
-    background: var(--hijau-latar);
-}
-
-.bayar--partial {
-    color: var(--biru);
-    background: var(--biru-latar);
-}
-
-.bayar--unpaid {
-    color: var(--kuning);
-    background: var(--kuning-latar);
-}
-
-.lihat {
-    width: 2.1rem;
-    height: 2.1rem;
-    border-radius: var(--lengkung-kecil);
-    background: var(--biru-latar);
-    color: var(--biru);
-    border: 1px solid #BFDBFE;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.lihat:hover {
-    background: var(--biru);
-    color: #fff;
-}
-
-.galat {
-    margin: 0;
-    padding: 1rem 1.25rem;
-    font-size: .8125rem;
-    color: var(--merah);
-}
-
-/* ── modal ──────────────────────────────────────────────── */
-.tirai {
-    position: fixed;
-    inset: 0;
-    z-index: 50;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 1rem;
-    background: rgba(17, 24, 39, .5);
-    backdrop-filter: blur(2px);
-}
-
-.kotak {
-    background: var(--panel);
-    width: 100%;
-    max-width: 28rem;
-    max-height: 95vh;
-    overflow-y: auto;
-    border-radius: var(--lengkung);
-    box-shadow: var(--bayang-angkat);
-    display: flex;
-    flex-direction: column;
-}
-
-.kotak--lebar {
-    max-width: 44rem;
-}
-
-.kotak__kepala {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1rem 1.25rem;
-    border-bottom: 1px solid var(--garis);
-    position: sticky;
-    top: 0;
-    background: var(--panel);
-}
-
-.kotak__kepala h3 {
-    margin: 0;
-    font-size: .9375rem;
-    font-weight: 700;
-}
-
-.x {
-    width: 2rem;
-    height: 2rem;
-    border-radius: 999px;
-    border: none;
-    background: var(--latar);
-    color: var(--redup);
-    cursor: pointer;
-}
-
-.x:hover {
-    color: var(--merah);
-}
-
-.kotak__isi {
-    padding: 1.25rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-.kotak__kaki {
-    display: flex;
-    justify-content: flex-end;
-    gap: .6rem;
-    padding: 1rem 1.25rem;
-    border-top: 1px solid var(--garis);
-    position: sticky;
-    bottom: 0;
-    background: var(--panel);
-}
-
-.bidang {
-    display: flex;
-    flex-direction: column;
-    gap: .4rem;
-}
-
-.bidang em {
-    color: var(--merah);
-    font-style: normal;
-}
-
-.bidang input,
-.bidang select {
-    font-family: inherit;
-    font-size: .8125rem;
-    padding: .55rem .7rem;
-    background: var(--latar);
-    border: 1px solid var(--garis);
-    border-radius: var(--lengkung-kecil);
-    color: var(--teks);
-}
-
-.bidang input:focus,
-.bidang select:focus {
-    outline: none;
-    border-color: var(--biru);
-}
-
-.bidang input.baca {
-    color: var(--redup);
-}
-
-.dua {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: .75rem;
-}
-
-.berkas__nama {
-    font-size: .75rem;
-    color: var(--hijau);
-}
-
-.galat--modal {
-    padding: .6rem .75rem;
-    background: var(--merah-latar);
-    border: 1px solid #FECACA;
-    border-radius: var(--lengkung-kecil);
-}
-
-/* ── detail ─────────────────────────────────────────────── */
-.detail {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1.5rem;
-}
-
-.detail__info {
-    display: flex;
-    flex-direction: column;
-    gap: .9rem;
-}
-
-.detail__info p {
-    margin: .2rem 0 0;
-    font-size: .875rem;
-    font-weight: 600;
-}
-
-.detail__prog-kepala {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: .4rem;
-    font-size: .75rem;
-    font-weight: 700;
-}
-
-.detail__prog-kepala .ok {
-    color: var(--hijau);
-}
-
-.detail__prog-kepala .pending {
-    color: var(--kuning);
-}
-
-.detail__prog-kepala .redup {
-    color: var(--redup);
-}
-
-.detail__berkas {
-    display: flex;
-    flex-direction: column;
-    gap: .6rem;
-}
-
-.fbaris {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: .7rem .85rem;
-    border: 1px solid var(--garis);
-    border-radius: var(--lengkung-kecil);
-}
-
-.fbaris__judul {
-    margin: 0 0 .35rem;
-    font-size: .8125rem;
-    font-weight: 600;
-}
-
-.fbaris__aksi {
-    display: flex;
-    gap: .4rem;
-}
-
-.ikon {
-    width: 2rem;
-    height: 2rem;
-    border-radius: var(--lengkung-kecil);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid transparent;
-    cursor: pointer;
-    text-decoration: none;
-}
-
-.ikon--unduh {
-    color: var(--hijau);
-    background: var(--hijau-latar);
-    border-color: #A7F3D0;
-}
-
-.ikon--unduh:hover {
-    color: #fff;
-    background: var(--hijau);
-}
-
-.ikon--upload {
-    color: var(--redup);
-    background: var(--latar);
-    border-color: var(--garis);
-}
-
-.ikon--upload:hover {
-    color: var(--biru);
-    background: var(--biru-latar);
-}
-
-.nota {
-    margin: .25rem 0 0;
-    font-size: .6875rem;
-    color: var(--redup);
-    line-height: 1.5;
-}
-
-@media (max-width: 900px) {
-    .baris {
-        grid-template-columns: 1fr;
-        gap: .75rem;
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(5px);
     }
 
-    .berkas {
-        grid-template-columns: 1fr;
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(15px) scale(0.98);
     }
 
-    .audit {
-        align-items: flex-start;
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
     }
+}
 
-    .detail {
-        grid-template-columns: 1fr;
-    }
+z .no-scrollbar-mobile::-webkit-scrollbar {
+    display: none;
+}
+
+.no-scrollbar-mobile {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+    height: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: #cbd5e1;
+    border-radius: 10px;
 }
 </style>

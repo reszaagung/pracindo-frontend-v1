@@ -6,7 +6,7 @@ export const MENU_RND = [
         id: 'produksi',
         label: 'Sesi Produksi',
         ikon: 'pi-cog',
-        rute: '/rnd/produksi', // Kita pindahkan rute utama produksi ke sini
+        rute: '/rnd/produksi',
     },
     {
         id: 'formula',
@@ -14,12 +14,14 @@ export const MENU_RND = [
         ikon: 'pi-box',
         rute: '/rnd/formula',
     },
+    // ---- TAMBAHKAN BLOK INI ----
     {
         id: 'tangki',
         label: 'Monitor Tangki',
         ikon: 'pi-database',
         rute: '/rnd/tangki',
     },
+    // -----------------------------
     {
         id: 'riset',
         label: 'Riset Pasar',
@@ -42,9 +44,8 @@ export const MENU_RND = [
 
 export function useNavRnd() {
     const route = useRoute()
-    const menu = computed(() => MENU_RND)
 
-    // Cek apakah URL saat ini cocok dengan rute menu
+    const menu = computed(() => MENU_RND)
     const aktif = (rute) => {
         if (rute === '/rnd' && route.path === '/rnd') return true
         if (rute !== '/rnd' && route.path.startsWith(rute)) return true
