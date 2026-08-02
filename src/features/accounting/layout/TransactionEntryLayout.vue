@@ -1,22 +1,3 @@
-<!--
-  src/features/accounting/layout/InputTransaksiLayout.vue
-  =======================================================
-  Versi Tailwind — struktur, kelas, dan gaya mengikuti file referensi apa
-  adanya. BUTUH Tailwind v4 terpasang (lihat instruksi di jawaban chat);
-  tanpa itu halaman render polos tanpa gaya.
-
-  Yang disesuaikan dengan proyek ini:
-    1. `menus` diisi rute yang BENAR-BENAR ADA. Daftar di referensi
-       (/accounting/procurement, /suplier, /customer, /dokumen, /belanja)
-       tidak terdaftar di router kita — lima dari enam ikon akan mati.
-       Sumbernya useNavTransaksi supaya rel dan kartu pemilih di
-       InputTransaksi.vue tidak pernah berbeda isi. HANYA transaksi —
-       Daftar PO dan Buku tagihan ada di modul Akunting, bukan di sini.
-    2. useLayout diimpor dari '@/composables/', bukan '@/utils/'.
-    3. useAuth kita mengekspor `logout`, bukan `handleLogout`.
-    4. Item ber-`siap: false` (Penjualan) tampil redup dan tidak bisa
-       diklik — backend sales_order belum punya service.
--->
 <template>
     <div class="flex h-screen bg-[#F8FAFC] font-sans text-slate-700 overflow-hidden relative">
 
@@ -111,8 +92,8 @@ const router = useRouter()
 const { logout } = useAuth()
 const { sidebarAktif, isMobile, toggleSidebar, tutupDiMobile } = useLayout()
 const { transaksi, aktif } = useNavTransaksi()
-// Kembali ke DASHBOARD, bukan /accounting: sejak Input Transaksi jadi modul
-// sendiri di dashboard, pintu masuk dan pintu keluarnya harus sama tempat.
+
+
 const kembali = () => router.push('/')
 
 const klikMenu = (menu) => {

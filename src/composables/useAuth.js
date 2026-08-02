@@ -1,130 +1,81 @@
-/**
- * composables/useAuth.js
- * =======================
- * Login, logout, dan identitas user — TERSAMBUNG API. State GLOBAL
- * (ref di luar fungsi): dipanggil banyak komponen, harus salinan sama.
- *
- * Kontrak backend:
- *   POST staff_user/login/   {identifier, password} -> {token, access_card}
- *                            `identifier` boleh username ATAU email
- *   POST staff_user/logout/  -> 204
- *   GET  staff_user/me/      -> access_card (rehydrate saat reload)
- *   POST staff_user/register/        {username,email,password,password2,
- *                                     nama_lengkap,jabatan?,telepon?,akun}
- *                                    -> 201, akun NONAKTIF role STAFF.
- *                                    TIDAK mengembalikan token: user belum
- *                                    boleh masuk sebelum Supervisor menyetujui.
- *   GET  staff_user/entitas-publik/  -> [{id,kode,nama}] untuk dropdown daftar
- *
- * Backend menghapus token lama setiap login — satu sesi aktif per user.
- *
- * ⚠ PRASYARAT BACKEND (lihat SPEK-BACKEND.md):
- *   1. staff_user/urls.py punya DUA blok urlpatterns — blok SimpleJWT
- *      menang. Sebelum ditambal, login/ bisa mengembalikan {access,refresh}
- *      (JWT) padahal api.js mengirim `Authorization: Token ...` -> gejala
- *      "login sukses tapi semua request 401".
- *   2. access_card belum mengirim `profil_staff_id` — tombol approve di
- *      papan tugas butuh itu. Patch satu baris di build_access_card().
- */
-
 import { ref, computed } from 'vue'
-import api, { KUNCI_TOKEN } from '@/utils/api'
-import { bacaError } from '@/utils/error'
-import { CacheService } from '@/utils/cacheService'
+import api from '@/utils/api'
 
-const KUNCI_KARTU = 'pracindo_access_card'
+// STATE LEVEL MODUL: Dideklarasikan di luar fungsi agar semua 
+// komponen yang memanggil useAuth() merujuk ke memori yang sama.
+const token = ref(localStorage.getItem('token') || null)
+const profil = ref(JSON.parse(localStorage.getItem('profil') || 'null'))
+const modul = ref(JSON.parse(localStorage.getItem('modul') || '[]'))
 
-const token = ref(localStorage.getItem(KUNCI_TOKEN) || null)
-const accessCard = ref(JSON.parse(localStorage.getItem(KUNCI_KARTU) || 'null'))
 const sedangProses = ref(false)
 
 export function useAuth() {
-    const sudahLogin = computed(() => !!token.value && !!accessCard.value)
-    const role = computed(() => accessCard.value?.role ?? null)
-    const isSupervisor = computed(() => accessCard.value?.is_supervisor ?? false)
-    const akun = computed(() => accessCard.value?.akun ?? null)
-    const staffId = computed(() => accessCard.value?.profil_staff_id ?? null)
+    const masuk = computed(() => !!token.value)
+    const bisaAkses = (kode) => modul.value.some((m) => m.kode === kode)
 
-    const simpanSesi = (tokenBaru, kartu) => {
-        token.value = tokenBaru
-        accessCard.value = kartu
-        localStorage.setItem(KUNCI_TOKEN, tokenBaru)
-        localStorage.setItem(KUNCI_KARTU, JSON.stringify(kartu))
+    const simpan = (data) => {
+        token.value = data.token
+        profil.value = data.profil
+        modul.value = data.modul
+
+        localStorage.setItem('token', data.token)
+        localStorage.setItem('profil', JSON.stringify(data.profil))
+        localStorage.setItem('modul', JSON.stringify(data.modul))
     }
 
-    const hapusSesi = () => {
+    const keluar = () => {
         token.value = null
-        accessCard.value = null
-        localStorage.removeItem(KUNCI_TOKEN)
-        localStorage.removeItem(KUNCI_KARTU)
-        CacheService.clearAll()
+        profil.value = null
+        modul.value = []
+
+        localStorage.removeItem('token')
+        localStorage.removeItem('profil')
+        localStorage.removeItem('modul')
     }
 
-    /** @param identifier username/email */
-    const login = async (identifier, password) => {
+    const login = async (username, password) => {
         sedangProses.value = true
         try {
-            const { data } = await api.post('staff_user/login/', { identifier, password })
-            simpanSesi(data.token, data.access_card)
-            return { success: true }
+            const { data } = await api.post('auth/login/', { username, password })
+            simpan(data)
+            return { success: true, data }
         } catch (err) {
-            return { success: false, message: bacaError(err, 'Login gagal.') }
+            const pesan = err.response?.data?.detail || 'Username atau password salah.'
+            return { success: false, message: pesan }
         } finally {
             sedangProses.value = false
         }
     }
 
-    const logout = async () => {
-        try {
-            await api.post('staff_user/logout/')
-        } catch {
-
-        } finally {
-            hapusSesi()
-        }
-    }
-
-    /**
-     * Daftar staf baru. Backend memaksa role STAFF dan is_active=False —
-     * pendaftar TIDAK bisa memilih wewenangnya sendiri, dan akunnya belum
-     * bisa dipakai login sampai Supervisor menyetujui.
-     * @returns {{success: boolean, message?: string}}
-     */
-    const daftar = async (data) => {
+    const register = async (payload) => {
         sedangProses.value = true
         try {
-            await api.post('staff_user/register/', data)
+            await api.post('auth/register/', payload)
             return { success: true }
         } catch (err) {
-            return { success: false, message: bacaError(err, 'Pendaftaran gagal.') }
+            const pesan = err.response?.data?.detail || 'Pendaftaran gagal. Username atau email mungkin sudah terdaftar.'
+            return { success: false, message: pesan }
         } finally {
             sedangProses.value = false
         }
     }
-    const muatEntitas = async () => {
-        try {
-            const { data } = await api.get('staff_user/entitas-publik/')
-            return data
-        } catch {
-            return []
-        }
-    }
 
-    const muatUlangKartu = async () => {
-        if (!token.value) return false
+
+
+
+    const logout_api = async () => {
         try {
-            const { data } = await api.get('staff_user/me/')
-            accessCard.value = data
-            localStorage.setItem(KUNCI_KARTU, JSON.stringify(data))
-            return true
-        } catch {
-            return false
+            await api.post('auth/logout/')
+        } catch (e) {
+        } finally {
+            keluar()
         }
     }
 
     return {
-        token, accessCard, sedangProses,
-        sudahLogin, role, isSupervisor, akun, staffId,
-        login, daftar, muatEntitas, logout, muatUlangKartu, hapusSesi,
+        token, profil, modul, sedangProses,
+        masuk, bisaAkses,
+        simpan, keluar, login, logout: logout_api,
+        register
     }
 }
