@@ -153,7 +153,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { usePurchaseOrder } from '@/composables/usePurchaseOrder'
+import { usePurchaseOrder } from '@/features/accounting/composables/usePurchaseOrder'
 
 const router = useRouter()
 

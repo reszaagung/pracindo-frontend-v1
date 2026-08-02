@@ -78,7 +78,7 @@ export const CacheService = {
  * Helper: ambil dari cache, kalau kosong panggil fetcher lalu simpan.
  *
  *   const akun = await denganCache(CACHE_KEY.AKUN, () =>
- *     api.get('entitas/akun/').then(r => r.data.results || r.data)
+ *     api.get('akunting/akun/').then(r => r.data.results || r.data)
  *   )
  */
 export const denganCache = async (key, fetcher, ttlMenit = 15) => {

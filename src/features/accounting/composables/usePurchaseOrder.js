@@ -52,7 +52,7 @@ export function usePurchaseOrder() {
                 }))
             }
 
-            const { data } = await api.post('akunting/po/', payload)
+            const { data } = await api.post('akunting/purchase-order/', payload)
             return { success: true, data }
         } catch (err) {
             const pesan = bacaError(err, 'Gagal menyimpan Purchase Order.')

@@ -37,52 +37,21 @@
             </p>
         </section>
 
-        <section class="blok">
-            <div class="blok__kepala">
-                <h2 class="stensil">Papan tugas</h2>
-                <router-link to="/work-order" class="tautan">Semua</router-link>
-            </div>
-
-            <LoadingBar v-if="isLoading" pesan="Membaca papan tugas" />
-
-            <template v-else-if="mading.length">
-                <p v-if="terlambat.length" class="telat-info">
-                    {{ terlambat.length }} lewat tenggat
-                </p>
-                <TransitionGroup name="kartu" tag="div" class="wo-list">
-                    <WorkOrderCard v-for="wo in mading" :key="wo.id" :wo="wo" :staff-id="staffId"
-                        :sibuk="sedangApprove === wo.id" @approve="approveWO" />
-                </TransitionGroup>
-            </template>
-
-            <div v-else class="kotak-kosong">
-                <EmptyState pesan="Papan kosong." petunjuk="Semua tugas yang ditujukan ke kamu sudah dikerjakan." />
-            </div>
-        </section>
     </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useWorkOrder } from '@/features/work-order/composables/useWorkOrder'
 import { useAuth } from '@/composables/useAuth'
 import { MODUL, modulDashboard } from '@/config/modules'
 import ModuleCard from '@/components/ModuleCard.vue'
-import WorkOrderCard from '@/components/WorkOrderCard.vue'
-import EmptyState from '@/components/ui/EmptyState.vue'
-import LoadingBar from '@/components/ui/LoadingBar.vue'
 
 const router = useRouter()
 const { accessCard, logout } = useAuth()
 const kartu = computed(() => accessCard.value ?? {
     nama_lengkap: 'Pengguna', role: 'STAFF', role_display: 'Staf', akun: null,
 })
-
-const {
-    mading, isLoading, sedangApprove, staffId,
-    terlambat, fetchMading, approveWO,
-} = useWorkOrder(kartu)
 
 const modulSaya = computed(() => modulDashboard(kartu.value.role))
 const namaDepan = computed(() => kartu.value.nama_lengkap.split(' ')[0])
@@ -96,7 +65,6 @@ const hitungan = ref({ tagihan: 2, transaksi: 3 })
 const sekarang = ref(new Date())
 let timer = null
 onMounted(() => {
-    fetchMading()
     timer = setInterval(() => (sekarang.value = new Date()), 60_000)
 })
 onUnmounted(() => clearInterval(timer))
