@@ -4,11 +4,7 @@
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
-import { useAuth } from '@/composables/useAuth'
 import Toast from 'primevue/toast'
-// Rehydrate access card sekali per muat aplikasi — token divalidasi ke
-
-const { muatUlangKartu } = useAuth()
-onMounted(muatUlangKartu)
+// useAuth()'s token/profil/modul refs hydrate synchronously from localStorage
+// on import — there's nothing to rehydrate on mount.
 </script>

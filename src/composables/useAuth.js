@@ -9,9 +9,30 @@ const modul = ref(JSON.parse(localStorage.getItem('modul') || '[]'))
 
 const sedangProses = ref(false)
 
+// Label tampilan saja — BUKAN aturan akses. Otorisasi modul selalu datang
+// dari backend lewat `modul`/bisaAkses, tidak pernah dari peta ini.
+const PERAN_LABEL = {
+    SUPERVISOR: 'Supervisor',
+    STAFF: 'Staf',
+    PRODUKSI: 'Produksi',
+    GUDANG: 'Gudang',
+    SALES: 'Sales',
+}
+
 export function useAuth() {
     const masuk = computed(() => !!token.value)
     const bisaAkses = (kode) => modul.value.some((m) => m.kode === kode)
+
+    // ProfilSerializer (staff_user/serializers.py) sudah mengirim `nama` dan
+    // `entitas_default_kode` langsung sebagai field flat — bukan nested di
+    // `akun`, dan `nama_lengkap` sendiri TIDAK ada di respons. role_display
+    // tidak dikirim backend sama sekali, jadi diturunkan lokal dari role.
+    const kartu = computed(() => profil.value && {
+        nama: profil.value.nama || profil.value.username || 'Pengguna',
+        role: profil.value.role,
+        role_display: PERAN_LABEL[profil.value.role] || profil.value.role || 'Staf',
+        entitas_default_kode: profil.value.entitas_default_kode ?? null,
+    })
 
     const simpan = (data) => {
         token.value = data.token
@@ -66,7 +87,7 @@ export function useAuth() {
     const logout_api = async () => {
         try {
             await api.post('auth/logout/')
-        } catch (e) {
+        } catch {
         } finally {
             keluar()
         }
@@ -74,7 +95,7 @@ export function useAuth() {
 
     return {
         token, profil, modul, sedangProses,
-        masuk, bisaAkses,
+        masuk, bisaAkses, kartu,
         simpan, keluar, login, logout: logout_api,
         register
     }

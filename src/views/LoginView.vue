@@ -86,7 +86,6 @@
                     <!-- Tautan ke Halaman Pendaftaran -->
                     <p class="text-center text-[14px] text-slate-500 font-medium">
                         Belum punya akun? <br>
-                        <!-- BAGIAN YANG DIPERBAIKI: to="/register" -->
                         <router-link to="/register"
                             class="text-teal-600 hover:text-teal-700 font-bold transition-colors">
                             Registrasi Staff
@@ -143,9 +142,24 @@ const handleLogin = async () => {
         form.password = ''
         return
     }
-
     const tujuan = route.query.next
-    router.push(typeof tujuan === 'string' && tujuan.startsWith('/') ? tujuan : '/')
+    if (typeof tujuan === 'string' && tujuan.startsWith('/') && tujuan !== '/') {
+        router.push(tujuan)
+        return
+    }
+
+    const daftarModul = (hasil.data.modul || []).map(m => String(m.kode).toLowerCase())
+
+    if (daftarModul.includes('akunting')) {
+        router.push('/accounting')
+    }
+    else if (daftarModul.includes('warehouse')) {
+        router.push('/warehouse')
+    }
+    else {
+
+        router.push('/accounting')
+    }
 }
 </script>
 

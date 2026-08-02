@@ -18,7 +18,7 @@ tidak ada. Koreksinya di §9.
 | `core` | ada | ada | sengaja tanpa endpoint |
 | `inventory` | ada | ada | belum |
 | `produksi` | ada | ada | belum |
-| `master` | ada | — | belum |
+| `master` | ada | ada | **ada** |
 | `dokumen` | ada | — | belum |
 | `keuangan` | ada | sebagian | sebagian, lewat akunting |
 | `sales_order` | **kosong** | — | belum |
@@ -77,7 +77,122 @@ Respons login: `{ token, profil, modul }`. `modul` berisi
 Kode gagal: `401` kredensial salah, `403` akun belum disetujui.
 Pendaftaran menghasilkan akun **nonaktif** sampai Supervisor menyetujui.
 
-### 3.2 Gudang — `/api/warehouse/`
+**`GET portal/`** — `PortalView` di `staff_user/views.py`, dipanggil
+setelah login (bukan cuma sekali saat masuk) untuk mengisi ulang `modul`
+dan **entitas**. Respons punya tiga field:
+
+```json
+{
+  "profil":  { "id": 3, "username": "budi", "nama": "Budi Santoso",
+               "role": "AKUNTING", "nip": "PC-0012",
+               "entitas_default": 1, "entitas_default_kode": "PT",
+               "is_active": true, "..." : "field lain di bawah" },
+  "modul":   [{ "kode": "akunting", "label": "Akunting",
+                "ikon": "buku", "rute": "/accounting" }],
+  "entitas": [{ "id": 1, "kode": "PT", "nama": "PT Pracindo Jaya Makmur" }]
+}
+```
+
+`entitas` berasal dari `entitas_terlihat()` dan **sudah tersaring** sesuai
+izin pengguna — jangan filter ulang di frontend, dan jangan bikin
+endpoint/composable entitas terpisah. Entitas tinggal di app `core` dan
+sengaja tidak diekspos sebagai resource tersendiri; ini satu-satunya
+tempat mengambilnya.
+
+**`profil` bukan cuma app `core`/PortalView — sumbernya `ProfilSerializer`
+di `staff_user/serializers.py`.** Field lengkapnya (bukan cuma yang
+ditampilkan di contoh di atas):
+
+```
+id, username, first_name, last_name, nama, email, nip, role, jabatan,
+jabatan_nama, foto, nomor_hp, atasan, atasan_nama, entitas_default,
+entitas_default_kode, entitas_diizinkan, status_kerja, tanggal_masuk,
+tanggal_keluar, is_active, last_login
+```
+
+Dua jebakan yang sudah pernah bikin bug di frontend:
+
+- **`nama` sudah jadi nama tampil** (`CharField(source='nama_lengkap')`
+  di serializer) — key JSON-nya `nama`, bukan `nama_lengkap`. Field
+  `nama_lengkap` **tidak pernah muncul** di respons; jangan cari itu.
+- **`entitas_default_kode` sudah flat di root `profil`**, bukan nested
+  di `profil.akun.kode`. Tidak ada objek `akun` di respons ini sama
+  sekali.
+- `role_display` **tidak dikirim backend** — `role` mentah saja
+  (enum). Kalau butuh label tampil, turunkan di frontend dari `role`.
+
+### 3.2 Master — `/api/master/`
+
+| Metode | Path |
+|---|---|
+| GET/POST | `suplier/` |
+| GET/POST | `produk/` |
+| GET/POST | `kategori/` |
+| GET/POST | `satuan/` |
+| GET/POST | `pelanggan/` |
+
+Baca terbuka untuk siapa pun yang login. Tulis (POST/PATCH) hanya
+`ADMIN` dan `SUPERVISOR` — role lain dapat `403`. Itu bukan bug; sembunyikan
+tombol tambah/ubah di UI untuk role tanpa izin alih-alih membiarkan
+pengguna menekan lalu kena `403`.
+
+Query param yang didukung `suplier/` dan `produk/`: `?ringkas=1`
+(bentuk ramping untuk dropdown, lewat `get_serializer_class()`),
+`?aktif=true` (django-filter `filterset_fields`), `?search=`.
+`produk/` juga menerima `?jenis=` (django-filter, bukan logika kustom).
+
+`?search=` **tidak menyisir field yang sama di semua resource** —
+diverifikasi langsung dari `master/views.py`:
+
+| Resource | `search_fields` |
+|---|---|
+| `produk/` | `kode`, `nama` |
+| `suplier/` | `kode`, `nama`, `npwp`, `kontak_nama` |
+| `kategori/`, `satuan/` | `kode`, `nama` |
+| `pelanggan/` | `kode`, `nama`, `npwp` |
+
+**Ejaan `suplier` satu p** — bukan `supplier`.
+
+Bentuk respons:
+
+```json
+// suplier, ringkas=1
+{ "id": 4, "kode": "SUP-004", "nama": "CV Sumber Makmur",
+  "termin_hari_default": 30 }
+
+// suplier, lengkap
+{ "id": 4, "kode": "SUP-004", "nama": "CV Sumber Makmur",
+  "npwp": "01.234.567.8-901.000", "pkp": true,
+  "alamat": "Jl. Industri No. 12", "kontak_nama": "Budi Santoso",
+  "kontak_hp": "081234567890", "email": "budi@sumbermakmur.co.id",
+  "termin_hari_default": 30, "aktif": true }
+
+// produk, ringkas=1
+{ "id": 7, "kode": "ST-001", "nama": "Gula pasir",
+  "satuan_kode": "kg", "jenis": "BAHAN_BAKU" }
+
+// produk, lengkap
+{ "id": 7, "kode": "ST-001", "nama": "Gula pasir",
+  "kategori": 2, "kategori_nama": "Bahan baku gula",
+  "satuan": 1, "satuan_kode": "kg", "jenis": "BAHAN_BAKU",
+  "jenis_label": "Bahan baku", "disimpan_di_tanki": false,
+  "aktif": true }
+```
+
+`jenis` produk: `BAHAN_BAKU`, `BARANG_JADI`, `KEMASAN`, `LAIN`.
+
+Data contoh yang sudah ada di database dev: entitas PT/CV/AGUS/MARSINI,
+suplier CV Sumber Makmur, produk `ST-001` dan dua produk uji berakhiran
+`TEST`.
+
+**`Satuan` ADALAH tabel master**, bukan `CharField` bebas — `Produk.satuan`
+adalah FK ke sana.
+
+**Kemasan bukan master data.** Dia enum `JenisKemasan` di
+`warehouse.models`, dipakai saat penerimaan (§3.3), bukan lewat
+`master/`.
+
+### 3.3 Gudang — `/api/warehouse/`
 
 | Metode | Path |
 |---|---|
@@ -125,7 +240,10 @@ otomatis** — tidak perlu request kedua:
                         "jenis": "BERAT_KURANG", "qty_selisih": "-1.500" }],
   "pesan": "1 laporan selisih terbit otomatis." }
 ```
-
+"item": [
+  { "id": 5, "nomor_lot": "ST-PT-0001", "nama_item": "Gula pasir",
+    "qty_diterima": "498.500", ... }
+]
 Laporan terbit kalau selisih berat melebihi toleransi **0,5%** atau ada
 qty ditolak.
 
@@ -143,7 +261,7 @@ keputusan finansial, bukan fakta fisik.
 Resolusi: `TERIMA`, `POTONG`, `SUSULAN`, `RETUR`, `GANTI`.
 `RETUR` belum didukung backend.
 
-### 3.3 Akunting — `/api/akunting/`
+### 3.4 Akunting — `/api/akunting/`
 
 | Metode | Path |
 |---|---|
@@ -204,7 +322,7 @@ non-Supervisor dapat `403`.
 Dialokasikan FIFO ke faktur terbuka berdasarkan jatuh tempo. Kelebihan
 otomatis jadi `UangMukaSuplier`.
 
-### 3.4 Status
+### 3.5 Status
 
 `PurchaseOrder`: `DRAFT`, `TERKIRIM`, `SEBAGIAN`, `SELESAI`, `BATAL`
 `FakturPembelian`: `BELUM_BAYAR`, `SEBAGIAN`, `LUNAS`, `BATAL`
@@ -410,6 +528,9 @@ Bagian ini bukan usulan — logikanya sudah ditulis dan diuji. Yang kurang
 hanya serializer, view, dan url. Kontrak di bawah mengikuti signature
 service yang sudah ada, jadi jangan diubah bentuknya.
 
+(Master **sudah punya** endpoint sekarang — lihat §3.2. Bagian ini cuma
+sisa untuk inventory dan produksi.)
+
 ### 7.1 Inventory
 
 **Tangki tinggal di `inventory`, bukan `produksi`.** Ini keputusan yang
@@ -473,27 +594,6 @@ bahannya habis.
 
 Nama tabelnya `Resep`, bukan `formula`.
 
-### 7.3 Master
-
-Model sudah ada, tapi **belum ada satu endpoint pun** — termasuk suplier.
-Spek lama menyebut `GET suplier/` "sudah ada"; itu tidak berlaku lagi.
-
-```
-GET master/produk/     ?aktif=true&jenis=BAHAN_BAKU
-GET master/suplier/    ?aktif=true
-GET master/pelanggan/  ?aktif=true       (bukan "customer")
-GET master/kategori/
-GET master/satuan/
-```
-
-**`Satuan` ADALAH tabel master**, bukan CharField bebas —
-`Produk.satuan` adalah FK ke sana. Spek lama keliru soal ini.
-
-**Kemasan bukan master data.** Dia enum `JenisKemasan` di
-`warehouse.models`, dipakai saat penerimaan.
-
-Master hanya baca untuk sekarang; service tambah/ubah belum ditulis.
-
 ---
 
 ## 8. BELUM ADA sama sekali
@@ -548,7 +648,7 @@ Bergantung pada `sales_order` yang juga belum ada.
 ### 8.3 Pajak, work order
 
 Belum dimodelkan. `pajak` menunggu kepastian status PKP tiap entitas —
-penomoran faktur pajak diatur DJP dan tidak boleh memakai
+penomoran faktur pajak diatur DJP dan tidak boleh memakai 
 `CounterDokumen`.
 
 ---

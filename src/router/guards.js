@@ -13,6 +13,14 @@ export const useGuards = (router) => {
 
     if (to.meta?.publik) {
       if (auth.masuk.value && (to.name === 'login' || to.name === 'register')) {
+        const daftarModul = auth.modul.value.map(m => m.kode)
+
+        if (daftarModul.includes('akunting')) {
+          return { path: '/accounting' }
+        } else if (daftarModul.includes('warehouse')) {
+          return { path: '/warehouse' }
+        }
+
         return { name: 'dashboard' }
       }
       return true
@@ -21,7 +29,6 @@ export const useGuards = (router) => {
     if (!auth.masuk.value) {
       return { name: 'login', query: { next: to.fullPath } }
     }
-
 
     if (to.meta?.modul && !auth.bisaAkses(to.meta.modul)) {
       alert('Akses Ditolak: Anda tidak memiliki wewenang untuk membuka modul ini.')

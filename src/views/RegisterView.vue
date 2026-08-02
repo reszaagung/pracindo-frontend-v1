@@ -84,7 +84,7 @@ import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 
 const router = useRouter()
-const { daftar, sedangProses } = useAuth()
+const { register, sedangProses } = useAuth()
 
 const daftarForm = reactive({
     nama_lengkap: '',
@@ -107,7 +107,7 @@ const handleDaftar = async () => {
         return
     }
 
-    const hasil = await daftar({ ...daftarForm })
+    const hasil = await register({ ...daftarForm })
 
     if (!hasil.success) {
         pesan.value = hasil.message
@@ -120,7 +120,5 @@ const handleDaftar = async () => {
         telepon: '', password: '', password2: '',
     })
 
-    // Opsional: Otomatis pindah ke halaman login setelah 3 detik
-    // setTimeout(() => router.push('/login'), 3000)
 }
 </script>

@@ -1,6 +1,5 @@
 // src/router/index.js
 import { createRouter, createWebHistory } from 'vue-router'
-import { useAuth } from '@/composables/useAuth'
 import { useGuards } from './guards'
 
 const routes = [
@@ -24,14 +23,31 @@ const routes = [
   },
   {
     path: '/accounting',
-    meta: { perluLogin: true, modul: 'accounting' },
+    meta: { perluLogin: true, modul: 'akunting' },
+    component: () => import('@/features/accounting/AccountingLanding.vue'),
+  },
+  {
+    path: '/accounting/transaksi/po',
+    meta: { perluLogin: true, modul: 'akunting' },
+    component: () => import('@/features/accounting/layout/TransactionEntryLayout.vue'),
     children: [
       {
-        path: 'transaksi/po',
+        path: '',
+        name: 'transaksi-po-list',
+        component: () => import('@/features/accounting/views/PurchaseOrderList.vue')
+      },
+      {
+        path: 'buat',
         name: 'transaksi-po',
         component: () => import('@/features/accounting/views/PurchaseOrderForm.vue')
       }
     ]
+  },
+  {
+    path: '/master/suplier',
+    name: 'master-suplier',
+    meta: { perluLogin: true, modul: 'master' },
+    component: () => import('@/features/master/views/Supplier.vue')
   },
   {
     path: '/:pathMatch(.*)*',

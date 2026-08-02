@@ -26,7 +26,7 @@
             </ul>
 
             <div class="side__kaki">
-                {{ kartu.nama_lengkap }} · {{ kartu.role_display }}
+                {{ kartu.nama }} · {{ kartu.role_display }}
             </div>
         </nav>
 
@@ -48,10 +48,10 @@ import { useLayout } from '@/composables/useLayout'
 import BaseIcon from '@/components/ui/BaseIcon.vue'
 
 const route = useRoute()
-const { accessCard } = useAuth()
+const { kartu: kartuAuth } = useAuth()
 const { sidebarAktif, toggleSidebar, tutupDiMobile } = useLayout()
 
-const kartu = computed(() => accessCard.value ?? { nama_lengkap: '—', role_display: '—' })
+const kartu = computed(() => kartuAuth.value ?? { nama: '—', role_display: '—' })
 const modul = computed(() => cariModul(route.meta?.modul))
 
 // Di layar kecil, sidebar menutup sendiri setelah pindah halaman.

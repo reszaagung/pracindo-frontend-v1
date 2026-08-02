@@ -1,42 +1,148 @@
 /**
  * src/config/modules.js
  * ======================
+ * Katalog UI SAJA. Siapa yang boleh masuk modul apa ditentukan backend lewat
+ * GET auth/portal/ (lihat useAuth().modul) — file ini tidak menyimpan aturan
+ * peran, hanya bagaimana modul itu tampil (ikon, label, menu, status siap).
  */
-
-export const ROLE = {
-  SUPERVISOR: 'SUPERVISOR',
-  STAFF: 'STAFF',
-  PRODUKSI: 'PRODUKSI',
-  GUDANG: 'GUDANG',
-  SALES: 'SALES',
-}
 
 export const MODUL = [
   {
-    id: 'transaksi',
-    nama: 'Input Transaksi',
-    ringkas: 'Pembuatan Purchase Order (PO)',
-    ikon: 'transaksi',
-    rute: '/accounting/transaksi/po',
-    roles: [ROLE.STAFF, ROLE.GUDANG],
+    id: 'akunting',
+    nama: 'Akunting',
+    ringkas: 'Purchase order, faktur, dan pembayaran',
+    ikon: 'buku',
+    rute: '/accounting',
     siap: true,
-    sembunyiDiDashboard: false,
     menu: [
+      { label: 'Portal Akunting', rute: '/accounting' },
       { label: 'Pembelian (PO)', rute: '/accounting/transaksi/po' },
     ],
   },
-
+  {
+    id: 'warehouse',
+    nama: 'Gudang',
+    ringkas: 'Penerimaan barang dan laporan selisih',
+    ikon: 'gudang',
+    rute: '/warehouse',
+    siap: false,
+    catatan: 'Layar penerimaan barang belum dibangun',
+    menu: [],
+  },
+  {
+    id: 'master',
+    nama: 'Master Data',
+    ringkas: 'Suplier, produk, dan data acuan lain',
+    ikon: 'master',
+    rute: '/master/suplier',
+    siap: true,
+    menu: [
+      { label: 'Suplier', rute: '/master/suplier' },
+    ],
+  },
+  {
+    id: 'produksi',
+    nama: 'Produksi',
+    ringkas: 'Resep dan sesi produksi',
+    ikon: 'produksi',
+    rute: '/produksi',
+    siap: false,
+    catatan: 'Endpoint backend belum ada',
+    menu: [],
+  },
+  {
+    id: 'logistik',
+    nama: 'Logistik',
+    ringkas: 'Surat jalan dan pengiriman',
+    ikon: 'kirim',
+    rute: '/logistik',
+    siap: false,
+    catatan: 'Belum dibangun backend maupun frontend',
+    menu: [],
+  },
+  {
+    id: 'sales_order',
+    nama: 'Sales Order',
+    ringkas: 'Pesanan penjualan dan piutang',
+    ikon: 'transaksi',
+    rute: '/sales-order',
+    siap: false,
+    catatan: 'Belum dibangun backend maupun frontend',
+    menu: [],
+  },
+  {
+    id: 'work_order',
+    nama: 'Work Order',
+    ringkas: 'Papan tugas antar staf',
+    ikon: 'transaksi',
+    rute: '/work-order',
+    siap: false,
+    catatan: 'Belum dimodelkan di backend',
+    menu: [],
+  },
+  {
+    id: 'inventory',
+    nama: 'Inventory',
+    ringkas: 'Stok tiga lapis dan posisi klaim',
+    ikon: 'gudang',
+    rute: '/inventory',
+    siap: false,
+    catatan: 'Endpoint backend belum ada',
+    menu: [],
+  },
+  {
+    id: 'keuangan',
+    nama: 'Keuangan',
+    ringkas: 'Pembayaran dan kas',
+    ikon: 'buku',
+    rute: '/keuangan',
+    siap: false,
+    catatan: 'Sebagian lewat modul akunting, layar sendiri belum ada',
+    menu: [],
+  },
+  {
+    id: 'pajak',
+    nama: 'Pajak',
+    ringkas: 'Faktur pajak',
+    ikon: 'buku',
+    rute: '/pajak',
+    siap: false,
+    catatan: 'Belum dimodelkan di backend',
+    menu: [],
+  },
+  {
+    id: 'dokumen',
+    nama: 'Dokumen',
+    ringkas: 'Lampiran surat jalan dan berkas lain',
+    ikon: 'master',
+    rute: '/dokumen',
+    siap: false,
+    catatan: 'Endpoint backend belum ada',
+    menu: [],
+  },
 ]
 
-export const bolehAkses = (modul, role) =>
-  role === ROLE.SUPERVISOR || modul.roles.includes(role)
+export const cariModul = (id) => MODUL.find((m) => m.id === id) ?? null
 
-export const modulUntuk = (role) => MODUL.filter(m => bolehAkses(m, role))
-
-export const modulDashboard = (role) =>
-  modulUntuk(role).filter(m => !m.sembunyiDiDashboard)
-
-export const cariModul = (id) => MODUL.find(m => m.id === id) ?? null
+/**
+ * Mengubah daftar modul dari backend ({ kode, label, ikon, rute }) menjadi
+ * kartu siap-render. Backend menentukan MODUL APA yang muncul (otorisasi);
+ * katalog lokal hanya menyumbang tampilannya (ringkas, menu, status siap).
+ */
+export const modulDariBackend = (modulBackend = []) =>
+  modulBackend.map((mb) => {
+    const lokal = cariModul(mb.kode)
+    return {
+      id: mb.kode,
+      nama: mb.label ?? lokal?.nama ?? mb.kode,
+      ikon: mb.ikon || lokal?.ikon || 'master',
+      rute: mb.rute || lokal?.rute || '/',
+      ringkas: lokal?.ringkas ?? '',
+      catatan: lokal?.catatan ?? '',
+      siap: lokal?.siap ?? false,
+      menu: lokal?.menu ?? [],
+    }
+  })
 
 export const IKON = {
   transaksi: '<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/>',

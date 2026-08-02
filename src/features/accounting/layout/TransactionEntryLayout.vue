@@ -85,7 +85,7 @@ import { watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useLayout } from '@/composables/useLayout'
-import { useNavTransaksi } from '@/features/accounting/composables/useNavTransaksi'
+import { useNavTransaksi } from '@/features/accounting/composables/useNavTransaction'
 
 const route = useRoute()
 const router = useRouter()

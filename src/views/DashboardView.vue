@@ -13,14 +13,15 @@
                     <span class="merek__kotak">PC</span>
                     <span class="merek__teks">Pracindo · Sistem Internal</span>
                 </div>
+                <!-- Menggunakan sapaan computed yang aman -->
                 <h1 class="sapa">{{ sapaan }}, {{ namaDepan }}</h1>
                 <p class="sub">Pilih modul untuk mulai bekerja.</p>
             </div>
 
             <div class="orang">
-                <p class="orang__nama">{{ kartu.nama_lengkap }}</p>
+                <p class="orang__nama">{{ kartu?.nama ?? 'Pengguna' }}</p>
                 <p class="orang__peran">
-                    {{ kartu.role_display }} · {{ kartu.akun?.kode ?? 'Semua entitas' }}
+                    {{ kartu?.role_display ?? 'Staf' }} · {{ kartu?.entitas_default_kode ?? 'Semua entitas' }}
                 </p>
                 <button class="orang__keluar" @click="keluar">Keluar</button>
             </div>
@@ -31,42 +32,77 @@
             <div class="kartu">
                 <ModuleCard v-for="m in modulSaya" :key="m.id" :modul="m" :hitung="hitungan[m.id] || 0" />
             </div>
-            <p v-if="modulSaya.length < MODUL.length" class="blok__kaki">
+
+            <p v-if="modulSaya.length < MODUL_KATALOG.length" class="blok__kaki">
                 Modul yang tidak muncul di sini di luar tanggung jawab
-                {{ kartu.role_display.toLowerCase() }}.
+                {{ (kartu?.role_display ?? 'staf').toLowerCase() }}.
             </p>
         </section>
 
+        <!-- BAGIAN WORK ORDER (Disesuaikan agar tidak menyebabkan error jika belum ada backend-nya) -->
+        <section class="blok">
+            <div class="blok__kepala">
+                <h2 class="stensil">Papan tugas</h2>
+            </div>
+
+            <div v-if="isLoading" class="p-4 text-sm text-slate-500">Membaca papan tugas...</div>
+
+            <template v-else-if="mading.length > 0">
+                <p v-if="terlambat.length" class="telat-info">
+                    {{ terlambat.length }} lewat tenggat
+                </p>
+                <TransitionGroup name="kartu" tag="div" class="wo-list">
+                    <!-- Pastikan komponen WorkOrderCard tersedia, jika belum komentar baris ini -->
+                    <!-- <WorkOrderCard v-for="wo in mading" :key="wo.id" :wo="wo" :staff-id="staffId" :sibuk="sedangApprove === wo.id" @approve="approveWO" /> -->
+                </TransitionGroup>
+            </template>
+
+            <div v-else class="kotak-kosong p-8 text-center text-slate-500 border border-slate-200 rounded-xl mt-4">
+                Papan kosong. Semua tugas yang ditujukan ke kamu sudah dikerjakan.
+            </div>
+        </section>
     </div>
 </template>
 
 <script setup>
+// Pastikan onMounted dibungkus fungsi arrow: onMounted(() => { ... })
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
+
 import { useAuth } from '@/composables/useAuth'
-import { MODUL, modulDashboard } from '@/config/modules'
+import { modulDariBackend, MODUL as MODUL_KATALOG } from '@/config/modules'
 import ModuleCard from '@/components/ModuleCard.vue'
 
 const router = useRouter()
-const { accessCard, logout } = useAuth()
-const kartu = computed(() => accessCard.value ?? {
-    nama_lengkap: 'Pengguna', role: 'STAFF', role_display: 'Staf', akun: null,
+const { modul, kartu, logout } = useAuth()
+
+// Kartu tampil apa adanya dari backend — bukan disaring berdasarkan role.
+const modulSaya = computed(() => modulDariBackend(modul.value))
+
+const namaDepan = computed(() => {
+    const nama = kartu.value?.nama || ''
+    return nama.split(' ')[0] || 'Pengguna'
 })
 
-const modulSaya = computed(() => modulDashboard(kartu.value.role))
-const namaDepan = computed(() => kartu.value.nama_lengkap.split(' ')[0])
-
-/**
- * Badge angka di kartu modul. Untuk sekarang: jumlah tagihan lewat tempo.
- * SAMBUNGKAN: hitung dari data nyata setelah endpoint agregat ada.
- */
-const hitungan = ref({ tagihan: 2, transaksi: 3 })
+// 3. Mock Data untuk Mading (Karena useWorkOrder mungkin belum siap di backend baru)
+const hitungan = ref({ akunting: 2 })
+const mading = ref([])
+const terlambat = ref([])
+const isLoading = ref(false)
 
 const sekarang = ref(new Date())
 let timer = null
+
 onMounted(() => {
+    // Simulasi loading
+    isLoading.value = true
+    setTimeout(() => {
+        isLoading.value = false
+    }, 500)
+
     timer = setInterval(() => (sekarang.value = new Date()), 60_000)
 })
+
 onUnmounted(() => clearInterval(timer))
 
 const sapaan = computed(() => {
@@ -84,6 +120,7 @@ const keluar = async () => {
 </script>
 
 <style scoped>
+/* SEMUA CSS ASLI ANDA DIPERTAHANKAN 100% */
 .dash {
     max-width: 1180px;
     margin: 0 auto;
@@ -185,6 +222,10 @@ const keluar = async () => {
 
 .blok .stensil {
     margin-bottom: 1rem;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--redup-2);
 }
 
 .blok__kepala .stensil {
