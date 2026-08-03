@@ -16,7 +16,7 @@ tidak ada. Koreksinya di §9.
 | `warehouse` | ada | ada | **ada** |
 | `akunting` | ada | ada | **ada** |
 | `core` | ada | ada | sengaja tanpa endpoint |
-| `inventory` | ada | ada | belum |
+| `inventory` | ada | ada | **ada** |
 | `produksi` | ada | ada | belum |
 | `master` | ada | ada | **ada** |
 | `dokumen` | ada | — | belum |
@@ -206,6 +206,27 @@ adalah FK ke sana.
 | POST | `laporan-selisih/{id}/tutup/` |
 | GET/POST | `packaging/` |
 
+**`GET po-siap-terima/`** — berpaginasi, `search_fields=['no_po','suplier__nama']`,
+`filterset_fields=['suplier','entitas']`. Bukan daftar item datar — PO
+dengan item bersarang:
+
+```json
+{ "id": 12, "no_po": "PO/PCJM/2026/VIII/0012", "tanggal": "2026-08-01",
+  "entitas_kode": "PT", "suplier": 4, "suplier_nama": "CV Sumber Makmur",
+  "status": "TERKIRIM", "tanggal_kirim_diminta": "2026-08-10", "catatan": "",
+  "item": [{ "id": 33, "produk": 7, "produk_kode": "ST-001",
+             "nama_item": "Gula pasir", "satuan": "kg",
+             "qty_pesan": "500.000", "qty_diterima": "0.000",
+             "sisa_qty": "500.000" }] }
+```
+
+`sisa_qty` adalah `qty_pesan − qty_diterima` (property model, read-only) —
+itulah batas atas input timbang, bukan `qty_pesan`.
+
+**`GET penerimaan/`** — berpaginasi, `search_fields=['nomor','no_surat_jalan','purchase_order__no_po']`,
+`filterset_fields=['purchase_order','ada_selisih','tanggal']`. Bentuk
+list (`PenerimaanListSerializer`): `{id, nomor, tanggal, po_nomor, suplier_nama, no_surat_jalan, ada_selisih}`.
+
 **`POST penerimaan/`**
 
 ```json
@@ -251,12 +272,43 @@ Unggah surat jalan dilakukan lebih dulu lewat modul dokumen; `dokumen_id`
 dikirim di payload ini. Jangan gabungkan upload file dengan POST
 penerimaan — kegagalan transaksi akan meninggalkan berkas yatim.
 
-`laporan-selisih/` menerima `?sisi=akunting` untuk menambahkan
-`nilai_selisih`, `resolusi`, dan `nilai_klaim`. Hanya berlaku kalau
-pengguna boleh masuk modul akunting.
+**`GET penerimaan/{id}/ringkasan/`** — bukan lewat serializer, `services.ringkasan_penerimaan`
+menulis `Response` manual (jadi bukan objek berpaginasi, ya, tapi
+memang cuma satu objek):
 
-`selesaikan/` dan `tutup/` menolak pengguna tanpa akses akunting — itu
-keputusan finansial, bukan fakta fisik.
+```json
+{ "nomor": "...", "tanggal": "...", "surat_jalan": "...", "po": "...",
+  "suplier": "...", "entitas": "...", "total_koli": 20, "ada_selisih": true,
+  "item": [{ "nama": "...", "kemasan": "KARUNG", "koli": 20, "isi_per_koli": "25.000",
+             "deklarasi": "500.000", "timbang": "498.500", "ditolak": "0",
+             "selisih_berat": "-1.500", "persen": "-0.30" }],
+  "selisih": [{ "nomor": "...", "jenis": "BERAT_KURANG", "qty": "-1.500",
+                "status": "DIBUKA", "resolusi": null, "klaim": null }] }
+```
+
+⚠ **Celah**: `selisih[].klaim` (nilai klaim Rupiah) ada di respons ini
+**tanpa gerbang `?sisi=` maupun cek peran akunting** — beda dari semua
+serializer lain di modul ini yang konsisten menyembunyikan uang dari
+gudang. Ini kelihatannya bug backend, bukan desain sengaja. Frontend
+gudang (`GoodsReceiptDetail.vue`) sengaja tidak merender field itu;
+sebaiknya ditutup di backend, bukan ditambal terus-menerus di setiap
+konsumen endpoint ini.
+
+`laporan-selisih/` menerima `?sisi=akunting` untuk menambahkan
+`nilai_selisih`, `resolusi`, `resolusi_label`, `nilai_klaim`,
+`catatan_resolusi`, `diselesaikan_pada`. Berlaku hanya kalau **query
+param terpasang DAN** `request.user.bisa_akses_modul('akunting')` —
+tanpa salah satunya, diam-diam jatuh balik ke serializer gudang (tidak
+error, cuma tidak menambahkan field-nya).
+
+**`GET laporan-selisih/terbuka/`** — `@action` custom, **bukan berpaginasi**
+(`Response` array polos, bukan `{results}`). Jangan unwrap `.results` di sini.
+
+Permission per aksi **tidak seragam**: `ajukan/` cuma butuh akses modul
+`warehouse` (siapa pun di gudang boleh submit klaim ke suplier).
+`selesaikan/` dan `tutup/` menambah cek manual
+`request.user.bisa_akses_modul('akunting')` → `403` tanpanya — itu
+keputusan finansial, bukan fakta fisik, jadi memang lebih ketat dari `ajukan/`.
 
 Resolusi: `TERIMA`, `POTONG`, `SUSULAN`, `RETUR`, `GANTI`.
 `RETUR` belum didukung backend.
@@ -322,7 +374,107 @@ non-Supervisor dapat `403`.
 Dialokasikan FIFO ke faktur terbuka berdasarkan jatuh tempo. Kelebihan
 otomatis jadi `UangMukaSuplier`.
 
-### 3.5 Status
+### 3.5 Inventory — `/api/inventory/`
+
+Semua di bawah **sudah hidup**, diverifikasi langsung dari
+`inventory/views.py`/`serializers.py`. Semua `ReadOnlyModelViewSet` —
+tidak ada create/update/delete lewat REST di luar tiga aksi POST khusus.
+
+| Metode | Path | Permission |
+|---|---|---|
+| GET | `stok/`, `stok/{id}/` | modul `inventory` (GUDANG, PRODUKSI, AKUNTING, +Supervisor) |
+| GET | `tangki/` | sama |
+| GET | `mutasi/` | sama |
+| GET | `posisi-klaim/` | sama |
+| GET | `isi-pool/` | sama |
+| GET | `nilai-ekuivalen/` | sama |
+| GET | `verifikasi/` | **Supervisor only** |
+| POST | `setor-ke-pool/` | **GUDANG, PRODUKSI** (bukan AKUNTING meski baca boleh) |
+| POST | `klaim-hasil/` | **GUDANG, PRODUKSI** |
+| POST | `opname/` | **Supervisor only** |
+
+**Paginasi — dua bentuk pengecualian, bukan satu:**
+
+- `stok/`, `tangki/`, `mutasi/`, `nilai-ekuivalen/` — berpaginasi normal (`{results}`).
+- `posisi-klaim/` — **array polos**, bukan lewat serializer/paginator sama
+  sekali (`list()` di-override, `Response(services.posisi_grup(grup_id))`
+  langsung). **`?grup=` wajib** — `400` tanpanya.
+- `isi-pool/` — bukan ViewSet, `APIView` polos. Respons **`{produk: [...], total_nilai}`**
+  — array-nya ada di dalam key `produk`, bukan array di root. **`?grup=` wajib** — `400` tanpanya.
+
+**`GET stok/`** — `?lapis=RAW|POOL|JADI`, `?grup=`, `?produk=`, dan
+`?sisi=akunting` (gerbangnya sama seperti `laporan-selisih/`: query
+param DAN `user.bisa_akses_modul('akunting')`).
+
+Field list (tanpa `sisi`): `id, produk, produk_kode, grup_bahan,
+grup_bahan_kode, lapis, lapis_label, tangki, tangki_kode, qty` — **tidak
+ada** `nilai`/`harga_rata` sama sekali di bentuk ini (bukan null, memang
+tidak dideklarasikan).
+
+Dengan `?sisi=akunting`, ditambah `nilai` dan `harga_rata`
+(`SerializerMethodField`). Untuk lapis **POOL**, kedua field itu tetap
+muncul di JSON tapi **selalu `null`** (`obj.berpemilik` `False` untuk
+POOL) — beda dari bentuk gudang yang field-nya memang tidak ada sama sekali.
+
+`stok/{id}/` (retrieve) menambah **`kepemilikan`** — array `SaldoEntitas`:
+`[{entitas, entitas_kode, qty}]`, plus `nilai` per baris kalau `?sisi=akunting`.
+Untuk lapis POOL, `kepemilikan` **selalu `[]`** — `SaldoEntitas.clean()`
+menolak baris di lapis POOL di level model, jadi datanya memang tidak
+mungkin ada.
+
+**`GET mutasi/`** — `?stok=`, `?jenis=` (django-filter `filterset_fields`).
+Field: `id, stok, produk_kode, lapis, urutan, tanggal, jenis, jenis_label,
+masuk, keluar, saldo_akhir, referensi, dibuat_pada`. `masuk`/`keluar`
+dua field terpisah, bukan satu delta.
+
+**`GET tangki/`** — `id, kode, nama, grup_bahan, grup_bahan_kode,
+kapasitas_kg, isi_kg, produk_terisi, produk_terisi_kode,
+ruang_kosong_kg, persen_terisi, aktif`.
+
+**`GET posisi-klaim/?grup=`** — bentuk **list** (yang dipakai layar
+posisi klaim) memakai nama field **beda dari nama model/retrieve**:
+
+```json
+[{ "entitas": "PT", "setor": "385", "ambil": "624", "bersih": "-239", "berhutang": true }]
+```
+
+`nilai_bersih` (nama field model & serializer `retrieve`) **tidak
+dipakai di list** — di sini namanya `bersih`, plus `total_setor`/`total_ambil`
+juga diringkas jadi `setor`/`ambil`, dan ada `berhutang` (boolean) siap pakai.
+
+**`GET isi-pool/?grup=`**:
+
+```json
+{ "produk": [{ "produk": "GULA-001", "qty": "1.000", "tarif": "1", "nilai": "1" }],
+  "total_nilai": "1" }
+```
+`qty` = sisa qty pool per produk, `tarif` = tarif ekuivalen yang dipakai,
+`nilai` = `qty × tarif`. `total_nilai` = jumlah `nilai` semua produk di
+grup itu — inilah yang harus sama dengan total `bersih` di `posisi-klaim/`
+(§5, invariant "Jumlah posisi bersih = nilai sisa pool").
+
+**`POST setor-ke-pool/`**: `{produk_id, grup_bahan_id, entitas_id, qty,
+tanggal, referensi?, idem_key?, tangki_raw_id?, tangki_pool_id?}`
+
+**`POST klaim-hasil/`**: `{produk_id, grup_bahan_id, entitas_id, qty,
+tanggal, referensi?, idem_key?, tangki_pool_id?, nilai_perolehan?}`
+
+**`POST opname/`**: `{produk_id, grup_bahan_id, lapis, qty_fisik,
+tanggal, referensi?, idem_key?, tangki_id?, entitas_id?, nilai_penyesuaian?}`
+
+**`idem_key`** — field **body**, bukan header, di ketiganya. Opsional;
+kalau kosong backend membuat `f'{aksi}:{uuid.uuid4()}'` sendiri —
+artinya **tanpa `idem_key` dari klien, retry TIDAK dianggap request yang
+sama** (dedup asli terjadi lewat kolom unique `idempotency_key` di
+`MutasiStok`/`MutasiKlaim`, dicocokkan ke `idem_key` yang dikirim).
+Frontend WAJIB membuat `idem_key` sekali saat form dibuka, simpan di
+state form, pakai ulang kalau submit gagal & dicoba lagi — jangan
+dibuat baru di dalam handler submit.
+
+Enum `MutasiStok.jenis`: `TERIMA`, `SETOR`, `PAKAI`, `HASIL`, `KLAIM`,
+`KIRIM`, `RETUR`, `OPNAME`, `SUSUT`.
+
+### 3.6 Status
 
 `PurchaseOrder`: `DRAFT`, `TERKIRIM`, `SEBAGIAN`, `SELESAI`, `BATAL`
 `FakturPembelian`: `BELUM_BAYAR`, `SEBAGIAN`, `LUNAS`, `BATAL`
@@ -415,22 +567,24 @@ Faktur **menolak terbit** kalau masih ada laporan berstatus `DIBUKA`,
 
 ## 5. Alur inventory — tiga lapis dan buku klaim
 
-Bagian ini menjelaskan logika yang endpoint-nya **belum ada**. Jangan
-bangun layarnya dulu, tapi pahami modelnya supaya layar gudang dan
-akunting tidak dibangun dengan asumsi yang salah.
+Endpoint bagian ini **sudah hidup** — lihat §3.5 untuk kontrak persisnya
+(payload, `idem_key`, permission per peran). Bagian ini menjelaskan
+modelnya supaya layar gudang, inventory, dan akunting tidak dibangun
+dengan asumsi yang salah.
 
 ### Perpindahan antar lapis
 
-| Fungsi | Dari | Ke | Kepemilikan |
-|---|---|---|---|
-| `terima_raw()` | suplier | RAW | melekat ke entitas PO |
-| `setor_ke_pool()` | RAW | POOL | **dilepas**, jadi klaim + |
-| `pakai_dari_pool()` | POOL | produksi | tidak ada |
-| `hasil_ke_pool()` | produksi | POOL | tidak ada |
-| `klaim_hasil()` | POOL | JADI | melekat lagi, klaim − |
+| Fungsi | Dari | Ke | Kepemilikan | Endpoint |
+|---|---|---|---|---|
+| `terima_raw()` | suplier | RAW | melekat ke entitas PO | `POST warehouse/penerimaan/` |
+| `setor_ke_pool()` | RAW | POOL | **dilepas**, jadi klaim + | `POST inventory/setor-ke-pool/` |
+| `pakai_dari_pool()` | POOL | produksi | tidak ada | belum ada (internal produksi) |
+| `hasil_ke_pool()` | produksi | POOL | tidak ada | belum ada (internal produksi) |
+| `klaim_hasil()` | POOL | JADI | melekat lagi, klaim − | `POST inventory/klaim-hasil/` |
 
-Hanya `terima_raw()` yang sudah punya endpoint — lewat
-`POST warehouse/penerimaan/`.
+`pakai_dari_pool()`/`hasil_ke_pool()` tidak punya endpoint langsung —
+dipicu dari siklus sesi produksi (§7.1), yang endpoint-nya sendiri
+masih belum ada.
 
 ### Kenapa POOL tidak punya pemilik
 
@@ -528,47 +682,10 @@ Bagian ini bukan usulan — logikanya sudah ditulis dan diuji. Yang kurang
 hanya serializer, view, dan url. Kontrak di bawah mengikuti signature
 service yang sudah ada, jadi jangan diubah bentuknya.
 
-(Master **sudah punya** endpoint sekarang — lihat §3.2. Bagian ini cuma
-sisa untuk inventory dan produksi.)
+(Master §3.2 dan inventory §3.5 **sudah punya** endpoint sekarang.
+Bagian ini cuma sisa untuk produksi.)
 
-### 7.1 Inventory
-
-**Tangki tinggal di `inventory`, bukan `produksi`.** Ini keputusan yang
-sudah dikunci; jangan pindahkan.
-
-```
-GET  inventory/stok/            ?lapis=RAW|POOL|JADI&grup=1
-GET  inventory/tangki/          role GUDANG dan PRODUKSI boleh
-GET  inventory/mutasi/          ?stok=12
-GET  inventory/posisi-klaim/    ?grup=1   -> posisi_grup()
-GET  inventory/isi-pool/        ?grup=1   -> isi_pool()
-GET  inventory/nilai-ekuivalen/
-POST inventory/setor-ke-pool/   -> setor_ke_pool()
-POST inventory/klaim-hasil/     -> klaim_hasil()
-POST inventory/opname/          -> sesuaikan_stok()
-```
-
-**PERSEDIAAN TIGA LAPIS** — ini yang paling berubah dari spek lama:
-
-| Lapis | Pemilik | Dicatat di |
-|---|---|---|
-| `RAW` | melekat | `SaldoEntitas` |
-| `POOL` | **tidak ada** | `MutasiKlaim` |
-| `JADI` | melekat | `SaldoEntitas` |
-
-Kepemilikan **dilepas saat setor ke pool**, bukan saat sesi selesai.
-Yang tersisa adalah klaim: `PosisiKlaim.nilai_bersih` negatif berarti
-entitas itu berhutang ke entitas lain dalam grup.
-
-Nilai ekuivalen adalah **tarif tetap** per produk untuk menyetarakan
-barang berbeda jenis. Bukan harga pasar. Tarif yang dipakai tersimpan di
-setiap baris `MutasiKlaim`, jadi perubahan tarif tidak menulis ulang
-sejarah.
-
-Enum `MutasiStok.jenis`: `TERIMA`, `SETOR`, `PAKAI`, `HASIL`, `KLAIM`,
-`KIRIM`, `RETUR`, `OPNAME`, `SUSUT`.
-
-### 7.2 Produksi
+### 7.1 Produksi
 
 ```
 GET  produksi/resep/            ?aktif=true
@@ -682,7 +799,7 @@ tak bertuan. Penyelesaian siapa berhutang berapa terjadi lewat
 punya pemilik tercatat.
 
 **Enum mutasi berbeda.** Bukan `PENERIMAAN`/`PEMAKAIAN`/`KOREKSI`, tapi
-sembilan nilai di §7.1.
+sembilan nilai di §3.5.
 
 **Pembayaran tidak menempel ke PO.** Tidak ada `RiwayatPembayaranPO`,
 tidak ada `PurchaseOrder.status_pembayaran`. Hutang hidup di
@@ -699,10 +816,13 @@ menyatakan sebaliknya.
 **Arah selisih.** `verifikasi_kepemilikan()` mengembalikan
 `stok.qty − Σ SaldoEntitas.qty`. Panel deviasi harus mengikuti arah ini.
 
-**Akses tangki.** `Tangki` ada di `inventory`, dan modul `inventory`
-terbuka untuk role `GUDANG`, `PRODUKSI`, dan `AKUNTING`. Jadi layar
-monitor tangki di `/warehouse/tangki` harus menembak
-`inventory/tangki/`, bukan `produksi/tanki/`.
+**Akses tangki — DIKONFIRMASI.** `Tangki` ada di `inventory`
+(`TangkiViewSet.permission_classes = [AksesModul]`, `modul='inventory'`),
+terbuka untuk role `GUDANG`, `PRODUKSI`, `AKUNTING` (+Supervisor selalu
+boleh). Layar monitor tangki hidup di `/inventory/tangki`
+(`TankMonitor.vue`, modul frontend `inventory`) dan menembak
+`inventory/tangki/` langsung — bukan di bawah `/warehouse`, dan bukan
+`produksi/tanki/`.
 
 **Nilai ekuivalen wajib diisi** sebelum setoran pool pertama.
 `NilaiEkuivalen.tarif()` melempar error kalau produk belum punya tarif.

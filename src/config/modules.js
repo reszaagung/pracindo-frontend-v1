@@ -25,9 +25,11 @@ export const MODUL = [
     ringkas: 'Penerimaan barang dan laporan selisih',
     ikon: 'gudang',
     rute: '/warehouse',
-    siap: false,
-    catatan: 'Layar penerimaan barang belum dibangun',
-    menu: [],
+    siap: true,
+    menu: [
+      { label: 'Penerimaan Barang', rute: '/warehouse' },
+      { label: 'Laporan Selisih', rute: '/warehouse/selisih' },
+    ],
   },
   {
     id: 'master',
@@ -86,9 +88,11 @@ export const MODUL = [
     ringkas: 'Stok tiga lapis dan posisi klaim',
     ikon: 'gudang',
     rute: '/inventory',
-    siap: false,
-    catatan: 'Endpoint backend belum ada',
-    menu: [],
+    siap: true,
+    menu: [
+      { label: 'Stok', rute: '/inventory' },
+      { label: 'Monitor Tangki', rute: '/inventory/tangki' },
+    ],
   },
   {
     id: 'keuangan',
