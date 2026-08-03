@@ -65,41 +65,30 @@
 </template>
 
 <script setup>
-// Pastikan onMounted dibungkus fungsi arrow: onMounted(() => { ... })
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { useAuth } from '@/composables/useAuth'
-import { modulDariBackend, MODUL as MODUL_KATALOG } from '@/config/modules'
+import { useWorkOrder } from '@/features/work-order/composables/useWorkOrder'
+import { MODUL as MODUL_KATALOG } from '@/config/modules'
 import ModuleCard from '@/components/ModuleCard.vue'
 
 const router = useRouter()
-const { modul, kartu, logout } = useAuth()
+const { kartu, logout } = useAuth()
 
-// Kartu tampil apa adanya dari backend — bukan disaring berdasarkan role.
 const modulSaya = computed(() => modulDariBackend(modul.value))
+
 
 const namaDepan = computed(() => {
     const nama = kartu.value?.nama || ''
     return nama.split(' ')[0] || 'Pengguna'
 })
-
-// 3. Mock Data untuk Mading (Karena useWorkOrder mungkin belum siap di backend baru)
-const hitungan = ref({ akunting: 2 })
-const mading = ref([])
-const terlambat = ref([])
-const isLoading = ref(false)
+const { hitungan, mading, terlambat, isLoading } = useWorkOrder()
 
 const sekarang = ref(new Date())
 let timer = null
 
 onMounted(() => {
-    // Simulasi loading
-    isLoading.value = true
-    setTimeout(() => {
-        isLoading.value = false
-    }, 500)
-
     timer = setInterval(() => (sekarang.value = new Date()), 60_000)
 })
 
@@ -118,7 +107,6 @@ const keluar = async () => {
     router.push('/login')
 }
 </script>
-
 <style scoped>
 /* SEMUA CSS ASLI ANDA DIPERTAHANKAN 100% */
 .dash {

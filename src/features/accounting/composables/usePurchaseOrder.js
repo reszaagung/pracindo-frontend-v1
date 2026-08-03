@@ -2,6 +2,12 @@ import { ref, computed } from 'vue'
 import api from '@/utils/api'
 import { bacaError } from '@/utils/error'
 
+// Helper bulan romawi (diletakkan di luar fungsi agar lebih hemat memori)
+const getBulanRomawi = (dateObj) => {
+    const romawi = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"]
+    return romawi[dateObj.getMonth()]
+}
+
 export function usePurchaseOrder() {
     // ==========================================
     // STATE UNTUK DAFTAR PO (LIST VIEW)
@@ -21,6 +27,9 @@ export function usePurchaseOrder() {
     const sedangProses = ref(false)
     const pesanError = ref('')
     const previewNomor = ref('')
+
+    // State baru untuk status periode
+    const periodeDitutup = ref(false)
 
     // ==========================================
     // LOGIKA DAFTAR PO
@@ -47,7 +56,6 @@ export function usePurchaseOrder() {
             .sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal))
     })
 
-    // "Menunggu barang" — cermin PurchaseOrderQuerySet.terbuka() di backend.
     const belumDiterima = computed(() =>
         daftarPO.value.filter(po => ['TERKIRIM', 'SEBAGIAN'].includes(po.status))
     )
@@ -73,9 +81,6 @@ export function usePurchaseOrder() {
         sedangProses.value = true
         pesanError.value = ''
         try {
-            // Entitas tidak punya endpoint sendiri (app core, sengaja tidak
-            // diekspos) — ikut di GET auth/portal/, sudah tersaring lewat
-            // entitas_terlihat() sesuai izin pengguna. Lihat SPEK-BACKEND.md §3.1.
             const [resPortal, resSupplier, resProduk] = await Promise.all([
                 api.get('auth/portal/'),
                 api.get('master/suplier/', { params: { ringkas: 1, aktif: true } }),
@@ -91,25 +96,74 @@ export function usePurchaseOrder() {
         }
     }
 
+    /**
+     * Preview nomor PO dirakit di frontend.
+     */
     const muatPreviewNomor = async (entitasId, tanggal) => {
         if (!entitasId || !tanggal) {
             previewNomor.value = 'Pilih entitas & tanggal'
             return
         }
+
+        const entitas = listEntitas.value.find(e => e.id === entitasId)
+        const kodeEntitas = entitas ? entitas.kode.toUpperCase() : ''
+
+        const prefixMap = {
+            'PT': 'PCJM',
+            'CV': 'CV',
+            'MARSINI': 'MRS',
+            'AGUS': 'AGS'
+        }
+
+        const kodePrefix = prefixMap[kodeEntitas] || kodeEntitas || 'PCJM'
+        const dateObj = new Date(tanggal)
+
         try {
-            const { data } = await api.get('akunting/purchase-order/preview-nomor/', {
+            const response = await api.get('akunting/purchase-order/generate-id/', {
                 params: { entitas: entitasId, tanggal: tanggal }
             })
-            previewNomor.value = data.nomor || 'TIDAK TERSEDIA'
-        } catch {
-            previewNomor.value = 'GAGAL MEMUAT NOMOR'
+
+            const nomorUrut = response.data?.urutan || '000'
+            const tahun = dateObj.getFullYear()
+            const bulanRomawi = getBulanRomawi(dateObj)
+
+            previewNomor.value = `PO/${kodePrefix}/${tahun}/${bulanRomawi}/${nomorUrut}`
+        } catch (err) {
+            console.error(`Gagal men-generate ID PO untuk entitas ID ${entitasId}:`, err)
+            const tahun = dateObj.getFullYear()
+            const bulanRomawi = getBulanRomawi(dateObj)
+            previewNomor.value = `PO/${kodePrefix}/${tahun}/${bulanRomawi}/XXX`
         }
     }
 
     /**
-     * Pencarian produk untuk AutoComplete — dipanggil ulang tiap ketikan
-     * karena listProduk (preload) cuma memuat sebagian katalog (berpaginasi).
+     * Mengecek status periode akuntansi berdasarkan Entitas dan Tanggal
      */
+    const cekStatusPeriode = async (entitasId, tanggal) => {
+        if (!entitasId || !tanggal) {
+            periodeDitutup.value = false
+            return
+        }
+
+        try {
+            const { data } = await api.get('core/periode/status/', {
+                params: { entitas: entitasId, tanggal: tanggal }
+            })
+
+            // Sesuaikan properti response dengan API aktual (misal: data.status, data.is_closed, dll)
+            const status = data.status || data.kondisi
+            periodeDitutup.value = (status === 'DITUTUP' || status === 'tutup' || data.is_closed === true)
+
+            if (periodeDitutup.value) {
+                pesanError.value = '' // Bersihkan pesan error lain agar UI fokus ke peringatan periode
+            }
+        } catch (err) {
+            console.error('Gagal mengecek status periode:', err)
+            // Fallback: anggap terbuka jika API gagal, agar form tidak terblokir permanen oleh error jaringan
+            periodeDitutup.value = false
+        }
+    }
+
     const cariProduk = async (query) => {
         try {
             const { data } = await api.get('master/produk/', {
@@ -121,14 +175,6 @@ export function usePurchaseOrder() {
         }
     }
 
-    /**
-     * Buat produk baru langsung dari form PO. Hanya boleh dipanggil kalau
-     * pemanggil sudah memastikan role ADMIN/SUPERVISOR — backend menolak
-     * role lain dengan 403.
-     * ponytail: jenis dipatok BAHAN_BAKU dan satuan dipatok 'kg' (konteks PO
-     * pembelian bahan baku). Tambahkan pemilih jenis/satuan kalau kelak PO
-     * juga dipakai untuk memesan barang jadi/kemasan.
-     */
     const buatProdukBaru = async (nama) => {
         const kode = `${nama.trim().toUpperCase().replace(/[^A-Z0-9]+/g, '-').slice(0, 16)}-${Date.now().toString(36).slice(-4).toUpperCase()}`
 
@@ -149,23 +195,26 @@ export function usePurchaseOrder() {
     }
 
     const simpanPO = async (form, isKirim = false) => {
+        // Validasi ekstra di level state
+        if (periodeDitutup.value) {
+            pesanError.value = 'Tidak dapat menyimpan PO karena periode telah ditutup.'
+            return { success: false, message: pesanError.value }
+        }
+
         sedangProses.value = true
         pesanError.value = ''
         try {
             const payloadItems = form.items
                 .filter(i => i.produk_id && parseFloat(i.qty_pesan) > 0)
-                .map(i => {
-                    const produk = listProduk.value.find(p => p.id === i.produk_id)
-                    return {
-                        produk_id: i.produk_id,
-                        qty_pesan: String(i.qty_pesan),
-                        harga_per_kg: String(i.harga_per_kg),
-                        satuan: i.satuan || produk?.satuan_kode || 'kg',
-                    }
-                })
+                .map(i => ({
+                    produk_id: i.produk_id,
+                    qty_pesan: String(i.qty_pesan),
+                    harga_per_kg: String(i.harga_per_kg || 0),
+                    satuan: i.satuan || 'kg',
+                }))
 
             if (!payloadItems.length) {
-                pesanError.value = 'Minimal harus ada 1 item dengan produk dan kuantitas lebih dari 0.'
+                pesanError.value = 'Minimal harus ada 1 item dengan produk dan Qty lebih dari 0.'
                 return { success: false, message: pesanError.value }
             }
 
@@ -184,7 +233,10 @@ export function usePurchaseOrder() {
             if (isKirim && idPO) {
                 await api.post(`akunting/purchase-order/${idPO}/kirim/`)
             }
+
+            await muatDaftarPO()
             return { success: true, data: res.data }
+
         } catch (err) {
             pesanError.value = bacaError(err, 'Gagal menyimpan PO.')
             return { success: false, message: pesanError.value }
@@ -197,9 +249,9 @@ export function usePurchaseOrder() {
         // List Exports
         daftarPO, isLoadingDaftar, cari, saringStatus, tampil,
         belumDiterima, draftCount, totalBulanIni, muatDaftarPO,
-        // Form Exports
         listEntitas, listSupplier, listProduk, sedangProses,
         pesanError, previewNomor, muatDataMaster, muatPreviewNomor,
-        cariProduk, buatProdukBaru, simpanPO
+        cariProduk, buatProdukBaru, simpanPO,
+        periodeDitutup, cekStatusPeriode
     }
 }

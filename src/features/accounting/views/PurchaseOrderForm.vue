@@ -88,7 +88,7 @@
                 <div class="panel__kepala">
                     <div>
                         <h2 class="panel__judul">Rincian item</h2>
-                        <p class="panel__sub">Qty = unit/kg × jml unit — kosongkan unit/kg untuk barang hitungan (pcs)
+                        <p class="panel__sub">Masukkan produk, kuantitas (Qty), dan harga.
                         </p>
                     </div>
                     <button type="button" class="tbl tbl--outline" @click="tambahItem">
@@ -99,10 +99,8 @@
                 <div class="tabel">
                     <div class="tabel__kepala">
                         <span>Produk</span>
-                        <span class="ka">Unit/kg</span>
-                        <span class="ka">Jml unit</span>
                         <span class="ka">Qty</span>
-                        <span class="ka">Harga /kg</span>
+                        <span class="ka">Harga</span>
                         <span class="ka">Subtotal</span>
                         <span></span>
                     </div>
@@ -115,14 +113,15 @@
                                 <span :class="{ 'opsi-baru': option.baru }">{{ option.label }}</span>
                             </template>
                         </AutoComplete>
-                        <input v-model.number="item.unit_kg" type="number" min="0" step="0.01" class="ka"
+
+                        <input v-model.number="item.qty" type="number" min="0" step="0.01" required class="ka"
                             placeholder="0" />
-                        <input v-model.number="item.total_unit" type="number" min="1" step="1" required class="ka"
-                            placeholder="0" />
-                        <span class="hitung">{{ angka(qty(item)) }}</span>
+
                         <input v-model.number="item.harga_per_kg" type="number" min="0" step="1" class="ka"
                             placeholder="0" />
+
                         <span class="hitung hitung--tebal">{{ rp(subtotal(item)) }}</span>
+
                         <button type="button" class="hapus" :disabled="draf.items.length === 1" aria-label="Hapus item"
                             @click="hapusItem(i)">×</button>
                     </div>
@@ -172,10 +171,10 @@ const hariIni = () => {
     return t.toISOString().slice(0, 10)
 }
 const rp = (n) => `Rp ${Number(n || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}`
-const angka = (n) => Number(n || 0).toLocaleString('id-ID', { maximumFractionDigits: 2 })
 
+// Hapus unit_kg dan total_unit, diganti menjadi qty saja
 const itemKosong = () => ({
-    produk: null, unit_kg: null, total_unit: null, harga_per_kg: null,
+    produk: null, qty: null, harga_per_kg: null,
 })
 
 const draf = reactive({
@@ -227,13 +226,9 @@ const pilihProduk = async (item, event) => {
     }
 }
 
-const qty = (item) => {
-    const kg = Number(item.unit_kg) || 0
-    const unit = Number(item.total_unit) || 0
-    return kg > 0 ? kg * unit : unit
-}
-const subtotal = (item) => qty(item) * (Number(item.harga_per_kg) || 0)
-
+// ── Perhitungan ──────────────────────────────
+// Qty diambil langsung dari input item.qty, subtotal = qty * harga
+const subtotal = (item) => (Number(item.qty) || 0) * (Number(item.harga_per_kg) || 0)
 const subtotalSemua = computed(() => draf.items.reduce((s, i) => s + subtotal(i), 0))
 
 const tambahItem = () => draf.items.push(itemKosong())
@@ -243,9 +238,9 @@ const hapusItem = (i) => {
 
 const kirim = async () => {
     pesanError.value = ''
-    const kosong = draf.items.some(i => !i.produk?.id || !(qty(i) > 0))
+    const kosong = draf.items.some(i => !i.produk?.id || !(Number(i.qty) > 0))
     if (kosong) {
-        pesanError.value = 'Setiap item butuh produk dan jumlah unit minimal 1. Unit/kg boleh dikosongkan untuk barang hitungan (pcs).'
+        pesanError.value = 'Setiap item butuh produk dan Qty (jumlah) minimal 1.'
         return
     }
 
@@ -257,7 +252,7 @@ const kirim = async () => {
         catatan: draf.catatan,
         items: draf.items.map(i => ({
             produk_id: i.produk.id,
-            qty_pesan: qty(i),
+            qty_pesan: Number(i.qty) || 0,
             harga_per_kg: Number(i.harga_per_kg) || 0,
             satuan: i.produk.satuan_kode,
         })),
@@ -271,6 +266,8 @@ const kirim = async () => {
 </script>
 
 <style scoped>
+/* CSS lain tetap sama sampai bagian tabel... */
+
 .kepala {
     display: flex;
     justify-content: space-between;
@@ -439,13 +436,16 @@ const kirim = async () => {
     overflow-x: auto;
 }
 
+/* === DISINI CSS GRID DIUBAH KARENA KOLOM BERKURANG === */
 .tabel__kepala,
 .tabel__baris {
     display: grid;
-    grid-template-columns: 2.5fr .8fr .8fr .9fr 1.2fr 1.3fr 2rem;
+    /* Lebar grid disesuaikan untuk 5 kolom: Produk, Qty, Harga, Subtotal, Action Hapus */
+    grid-template-columns: 3fr 1fr 1.5fr 1.5fr 2rem;
     gap: .5rem;
     align-items: center;
-    min-width: 48rem;
+    min-width: 40rem;
+    /* sedikit dikecilkan karena kolomnya berkurang */
 }
 
 .tabel__kepala {

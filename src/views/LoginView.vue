@@ -142,6 +142,7 @@ const handleLogin = async () => {
         form.password = ''
         return
     }
+
     const tujuan = route.query.next
     if (typeof tujuan === 'string' && tujuan.startsWith('/') && tujuan !== '/') {
         router.push(tujuan)
@@ -157,8 +158,8 @@ const handleLogin = async () => {
         router.push('/warehouse')
     }
     else {
-
-        router.push('/accounting')
+        // FALLBACK: Arahkan ke Dashboard utama jika tidak memiliki modul di atas
+        router.push('/')
     }
 }
 </script>

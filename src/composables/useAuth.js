@@ -1,5 +1,7 @@
+// src/composables/useAuth.js
 import { ref, computed } from 'vue'
 import api from '@/utils/api'
+import { MODUL as MODUL_KATALOG } from '@/config/modules' // <-- Impor Katalog UI
 
 // STATE LEVEL MODUL: Dideklarasikan di luar fungsi agar semua 
 // komponen yang memanggil useAuth() merujuk ke memori yang sama.
@@ -17,10 +19,13 @@ const PERAN_LABEL = {
     PRODUKSI: 'Produksi',
     GUDANG: 'Gudang',
     SALES: 'Sales',
+    AKUNTAN: 'AKUNTAN',
 }
 
 export function useAuth() {
     const masuk = computed(() => !!token.value)
+
+    // Router guard memanggil fungsi ini untuk mengecek izin akses rute
     const bisaAkses = (kode) => modul.value.some((m) => m.kode === kode)
 
     // ProfilSerializer (staff_user/serializers.py) sudah mengirim `nama` dan
@@ -37,11 +42,29 @@ export function useAuth() {
     const simpan = (data) => {
         token.value = data.token
         profil.value = data.profil
-        modul.value = data.modul
+
+        // ==============================================================
+        // OVERRIDE FRONTEND
+        // Mengubah paksa balasan backend dengan daftar modul berdasarkan 
+        // properti 'roles' yang baru saja ditambahkan di config/modules.js
+        // ==============================================================
+        const userRole = data.profil?.role || ''
+
+        // Memfilter MODUL_KATALOG dan membentuk ulang menjadi format array 
+        // object { kode: 'nama_modul' } agar sama persis seperti format backend
+        const overrideModul = MODUL_KATALOG
+            .filter(m => m.roles && m.roles.includes(userRole))
+            .map(m => ({ kode: m.id }))
+
+        // Jika mapping role frontend ada isinya, gunakan itu. 
+        // Jika kosong (misal role belum didaftarkan), gunakan bawaan dari backend.
+        const modulDiizinkan = overrideModul.length > 0 ? overrideModul : (data.modul || [])
+
+        modul.value = modulDiizinkan
 
         localStorage.setItem('token', data.token)
         localStorage.setItem('profil', JSON.stringify(data.profil))
-        localStorage.setItem('modul', JSON.stringify(data.modul))
+        localStorage.setItem('modul', JSON.stringify(modulDiizinkan))
     }
 
     const keluar = () => {
@@ -80,9 +103,6 @@ export function useAuth() {
             sedangProses.value = false
         }
     }
-
-
-
 
     const logout_api = async () => {
         try {

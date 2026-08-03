@@ -22,14 +22,34 @@ const routes = [
     component: () => import('@/views/DashboardView.vue'),
     meta: { perluLogin: true }
   },
+
+  // ==========================================
+  // MODUL AKUNTING (Telah dibungkus ModulLayout)
+  // ==========================================
+  // ==========================================
+  // MODUL AKUNTING (Halaman Dasar)
+  // ==========================================
   {
     path: '/accounting',
     meta: { perluLogin: true, modul: 'akunting' },
-    component: () => import('@/features/accounting/AccountingLanding.vue'),
+    component: ModulLayout,
+    children: [
+      {
+        path: '',
+        name: 'accounting-landing',
+        // Tetap redirect ke PO jika user mengklik menu Akunting
+        redirect: '/accounting/transaksi/po'
+      }
+    ]
   },
+
+  // ==========================================
+  // LAYOUT TRANSAKSI PO (Berdiri Sendiri)
+  // ==========================================
   {
     path: '/accounting/transaksi/po',
     meta: { perluLogin: true, modul: 'akunting' },
+    // Dikeluarkan dari ModulLayout, kembali menggunakan layout khususnya sendiri
     component: () => import('@/features/accounting/layout/TransactionEntryLayout.vue'),
     children: [
       {
@@ -44,12 +64,20 @@ const routes = [
       }
     ]
   },
+
+  // ==========================================
+  // MODUL MASTER DATA
+  // ==========================================
   {
     path: '/master/suplier',
     name: 'master-suplier',
     meta: { perluLogin: true, modul: 'master' },
     component: () => import('@/features/master/views/Supplier.vue')
   },
+
+  // ==========================================
+  // MODUL WAREHOUSE
+  // ==========================================
   {
     path: '/warehouse',
     meta: { perluLogin: true, modul: 'warehouse' },
@@ -78,6 +106,10 @@ const routes = [
       }
     ]
   },
+
+  // ==========================================
+  // MODUL INVENTORY
+  // ==========================================
   {
     path: '/inventory',
     meta: { perluLogin: true, modul: 'inventory' },
@@ -107,6 +139,10 @@ const routes = [
       }
     ]
   },
+
+  // ==========================================
+  // FALLBACK 404
+  // ==========================================
   {
     path: '/:pathMatch(.*)*',
     name: 'NotFound',
@@ -122,7 +158,6 @@ const router = createRouter({
     return { top: 0, behavior: 'smooth' }
   }
 })
-
 
 useGuards(router)
 

@@ -1,9 +1,8 @@
 /**
  * src/config/modules.js
  * ======================
- * Katalog UI SAJA. Siapa yang boleh masuk modul apa ditentukan backend lewat
- * GET auth/portal/ (lihat useAuth().modul) — file ini tidak menyimpan aturan
- * peran, hanya bagaimana modul itu tampil (ikon, label, menu, status siap).
+ * Katalog UI SAJA. Karena backend tidak mengembalikan hak akses dengan benar,
+ * penentuan akses di-override di frontend menggunakan properti `roles`.
  */
 
 export const MODUL = [
@@ -14,6 +13,7 @@ export const MODUL = [
     ikon: 'buku',
     rute: '/accounting',
     siap: true,
+    roles: ['AKUNTAN', 'SUPERVISOR'], // Ditambahkan
     menu: [
       { label: 'Portal Akunting', rute: '/accounting' },
       { label: 'Pembelian (PO)', rute: '/accounting/transaksi/po' },
@@ -26,6 +26,7 @@ export const MODUL = [
     ikon: 'gudang',
     rute: '/warehouse',
     siap: true,
+    roles: ['GUDANG', 'SUPERVISOR'], // Ditambahkan
     menu: [
       { label: 'Penerimaan Barang', rute: '/warehouse' },
       { label: 'Laporan Selisih', rute: '/warehouse/selisih' },
@@ -38,6 +39,7 @@ export const MODUL = [
     ikon: 'master',
     rute: '/master/suplier',
     siap: true,
+    roles: ['GUDANG', 'AKUNTAN', 'SUPERVISOR'], // Ditambahkan
     menu: [
       { label: 'Suplier', rute: '/master/suplier' },
     ],
@@ -50,6 +52,7 @@ export const MODUL = [
     rute: '/produksi',
     siap: false,
     catatan: 'Endpoint backend belum ada',
+    roles: ['PRODUKSI', 'SUPERVISOR'], // Ditambahkan
     menu: [],
   },
   {
@@ -60,6 +63,7 @@ export const MODUL = [
     rute: '/logistik',
     siap: false,
     catatan: 'Belum dibangun backend maupun frontend',
+    roles: ['GUDANG', 'SUPERVISOR'], // Ditambahkan
     menu: [],
   },
   {
@@ -70,6 +74,7 @@ export const MODUL = [
     rute: '/sales-order',
     siap: false,
     catatan: 'Belum dibangun backend maupun frontend',
+    roles: ['SALES', 'SUPERVISOR'], // Ditambahkan
     menu: [],
   },
   {
@@ -80,6 +85,7 @@ export const MODUL = [
     rute: '/work-order',
     siap: false,
     catatan: 'Belum dimodelkan di backend',
+    roles: ['GUDANG', 'AKUNTAN', 'PRODUKSI', 'SALES', 'STAFF', 'SUPERVISOR'], // Ditambahkan
     menu: [],
   },
   {
@@ -89,6 +95,7 @@ export const MODUL = [
     ikon: 'gudang',
     rute: '/inventory',
     siap: true,
+    roles: ['GUDANG', 'SUPERVISOR'], // Ditambahkan
     menu: [
       { label: 'Stok', rute: '/inventory' },
       { label: 'Monitor Tangki', rute: '/inventory/tangki' },
@@ -102,6 +109,7 @@ export const MODUL = [
     rute: '/keuangan',
     siap: false,
     catatan: 'Sebagian lewat modul akunting, layar sendiri belum ada',
+    roles: ['AKUNTAN', 'SUPERVISOR'], // Ditambahkan
     menu: [],
   },
   {
@@ -112,6 +120,7 @@ export const MODUL = [
     rute: '/pajak',
     siap: false,
     catatan: 'Belum dimodelkan di backend',
+    roles: ['AKUNTAN', 'SUPERVISOR'], // Ditambahkan
     menu: [],
   },
   {
@@ -122,17 +131,13 @@ export const MODUL = [
     rute: '/dokumen',
     siap: false,
     catatan: 'Endpoint backend belum ada',
+    roles: ['GUDANG', 'AKUNTAN', 'SUPERVISOR'], // Ditambahkan
     menu: [],
   },
 ]
 
 export const cariModul = (id) => MODUL.find((m) => m.id === id) ?? null
 
-/**
- * Mengubah daftar modul dari backend ({ kode, label, ikon, rute }) menjadi
- * kartu siap-render. Backend menentukan MODUL APA yang muncul (otorisasi);
- * katalog lokal hanya menyumbang tampilannya (ringkas, menu, status siap).
- */
 export const modulDariBackend = (modulBackend = []) =>
   modulBackend.map((mb) => {
     const lokal = cariModul(mb.kode)
