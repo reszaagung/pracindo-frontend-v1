@@ -8,21 +8,21 @@ export function useNavTransaksi() {
             id: 'po',
             label: 'Purchase Order',
             ikon: 'pi-file-edit',
-            rute: '/accounting/transaksi/po',
+            rute: '/accounting/input/po',
             activate: true
         },
         {
             id: 'pembelian',
             label: 'Pembelian Langsung',
             ikon: 'pi-shop',
-            rute: '/accounting/transaksi/pembelian',
+            rute: '/accounting/input/pembelian',
             activate: false
         },
         {
             id: 'pembayaran',
             label: 'Pembayaran',
             ikon: 'pi-wallet',
-            rute: '/accounting/transaksi/pembayaran',
+            rute: '/accounting/input/pembayaran',
             activate: false
         }
     ]

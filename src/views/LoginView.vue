@@ -112,13 +112,14 @@ import { useRoute, useRouter } from 'vue-router'
 import InputText from 'primevue/inputtext'
 import Button from 'primevue/button'
 import { useAuth } from '@/composables/useAuth'
+import { rutePertamaSiap } from '@/config/modules'
 
 import logoPracindo from '@/assets/logo_pt.svg'
 import ilustrationImg from '@/assets/ilustration.jpg'
 
 const route = useRoute()
 const router = useRouter()
-const { login, sedangProses } = useAuth()
+const { login, sedangProses, bisaAkses, modul } = useAuth()
 
 const form = reactive({ identifier: '', password: '' })
 const showPassword = ref(false)
@@ -143,24 +144,36 @@ const handleLogin = async () => {
         return
     }
 
+    // login() sudah memanggil simpan(), jadi bisaAkses() dan modul sudah
+    // memuat data yang baru saat baris-baris di bawah ini berjalan.
     const tujuan = route.query.next
-    if (typeof tujuan === 'string' && tujuan.startsWith('/') && tujuan !== '/') {
+    if (bolehKe(tujuan)) {
         router.push(tujuan)
         return
     }
 
-    const daftarModul = (hasil.data.modul || []).map(m => String(m.kode).toLowerCase())
+    router.push(rutePertamaSiap(modul.value) ?? { name: 'dashboard' })
+}
 
-    if (daftarModul.includes('akunting')) {
-        router.push('/accounting')
-    }
-    else if (daftarModul.includes('warehouse')) {
-        router.push('/warehouse')
-    }
-    else {
-        // FALLBACK: Arahkan ke Dashboard utama jika tidak memiliki modul di atas
-        router.push('/')
-    }
+/**
+ * Apakah `next` layak diikuti?
+ *
+ * Guard mengirim `next` apa adanya dari URL, jadi isinya belum tepercaya:
+ *   - harus path internal — '//situs-lain.com' adalah open redirect,
+ *     dan `startsWith('/')` saja tidak menangkapnya
+ *   - harus benar-benar ada rutenya, bukan jatuh ke catch-all 404
+ *   - modulnya harus lolos bisaAkses, kalau tidak pengguna login lalu
+ *     langsung dilempar guard ke halaman Akses Ditolak
+ */
+const bolehKe = (tujuan) => {
+    if (typeof tujuan !== 'string' || !tujuan.startsWith('/')) return false
+    if (tujuan === '/' || tujuan.startsWith('//')) return false
+
+    const cocok = router.resolve(tujuan)
+    if (cocok.name === 'NotFound') return false
+
+    const kodeModul = cocok.meta?.modul
+    return !kodeModul || bisaAkses(kodeModul)
 }
 </script>
 

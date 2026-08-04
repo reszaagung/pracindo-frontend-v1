@@ -1,158 +1,179 @@
 <template>
-    <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        <!-- HEADER -->
-        <header class="flex justify-between items-start flex-wrap gap-4 mb-6">
+    <div class="flex flex-col w-full animate-fade-in relative">
+        <!-- Header -->
+        <div class="mb-4 md:mb-6 flex justify-between items-end">
             <div>
-                <p class="text-xs text-gray-500 mb-1">
-                    <router-link to="/accounting" class="hover:text-gray-900 hover:underline">Portal
-                        Akunting</router-link> &rsaquo; Pembelian
+                <p class="text-xs text-slate-400 mb-1">
+                    <router-link to="/accounting" class="hover:text-slate-700 transition-colors">Portal
+                        Akunting</router-link> ›
+                    <!-- PERBAIKAN RUTE: Mengarah ke /input/ -->
+                    <router-link to="/accounting/input/po"
+                        class="hover:text-slate-700 transition-colors">Pembelian</router-link>
                 </p>
-                <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Purchase Order</h1>
+                <h2 class="text-xl md:text-2xl font-bold text-slate-800 tracking-tight">Purchase Order</h2>
             </div>
 
-            <!-- Rute ini diarahkan ke form pembuatan PO -->
-            <router-link to="/accounting/transaksi/po/buat"
-                class="inline-flex items-center gap-2 bg-slate-900 text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-slate-800 transition-colors">
-                <i class="pi pi-plus text-xs"></i> Buat PO Baru
+            <!-- PERBAIKAN RUTE: Mengarah ke /input/po/buat -->
+            <router-link to="/accounting/input/po/buat"
+                class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-colors flex items-center gap-2 shadow-sm transform hover:-translate-y-0.5">
+                <i class="pi pi-plus"></i> Buat PO Baru
             </router-link>
-        </header>
+        </div>
 
-        <!-- METRIK (Meniru StatCard) -->
-        <section
-            class="grid grid-cols-1 md:grid-cols-3 gap-[1px] bg-gray-200 border border-gray-200 rounded-xl overflow-hidden mb-6">
-            <div class="bg-white p-5">
-                <p class="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-1">PO Bulan Ini</p>
-                <p class="text-3xl font-bold text-gray-900">{{ formatNilaiBesar(totalBulanIni) }}</p>
-                <p class="text-xs text-gray-500 mt-2">{{ daftarPO.length }} dokumen dibuat</p>
+        <!-- Kartu Statistik -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <!-- Stat 1 -->
+            <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">PO BULAN INI</p>
+                <h3 class="text-2xl font-black text-slate-800">Rp {{ (totalBulanIni || 0).toLocaleString('id-ID') }}
+                </h3>
+                <p class="text-xs text-slate-500 mt-2">{{ daftarPO.length }} dokumen dibuat</p>
             </div>
-            <div class="bg-white p-5">
-                <p class="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-1">Belum Diterima Penuh</p>
-                <p class="text-3xl font-bold text-gray-900">{{ belumDiterima.length }}</p>
-                <p class="text-xs text-gray-500 mt-2">Menunggu barang datang</p>
+            <!-- Stat 2 -->
+            <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">BELUM DITERIMA PENUH</p>
+                <h3 class="text-2xl font-black text-slate-800">{{ belumDiterima.length }}</h3>
+                <p class="text-xs text-slate-500 mt-2">Menunggu barang datang</p>
             </div>
-            <div class="bg-white p-5">
-                <p class="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-1">Draft</p>
-                <p class="text-3xl font-bold" :class="draftCount > 0 ? 'text-amber-600' : 'text-gray-900'">{{
-                    draftCount }}</p>
-                <p class="text-xs mt-2 font-medium text-gray-500">Belum dikirim ke suplier</p>
+            <!-- Stat 3 -->
+            <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">DRAFT</p>
+                <h3 class="text-2xl font-black text-slate-800">{{ draftCount }}</h3>
+                <p class="text-xs text-slate-500 mt-2">Belum dikirim ke suplier</p>
             </div>
-        </section>
+        </div>
 
-        <!-- PANEL DAFTAR PO -->
-        <section class="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-            <div class="flex justify-between items-center flex-wrap gap-4 p-5 border-b border-gray-200 bg-gray-50">
+        <!-- Area Filter & Tabel -->
+        <div class="bg-white border border-slate-200 rounded-[24px] p-4 md:p-6 shadow-sm w-full min-h-[400px]">
+            <div
+                class="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-6 pb-4 border-b border-slate-100">
                 <div>
-                    <h2 class="text-sm font-bold text-gray-900">Daftar PO</h2>
-                    <p class="text-xs text-gray-500 mt-0.5">Terbaru di atas</p>
+                    <h3 class="text-sm font-bold text-slate-800">Daftar PO</h3>
+                    <p class="text-xs text-slate-500">Terbaru di atas</p>
                 </div>
 
-                <div class="flex items-center gap-3 flex-wrap">
-                    <div class="relative">
-                        <i class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
-                        <input v-model="cari" type="search"
-                            class="pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm w-48 lg:w-64 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
-                            placeholder="Cari nomor/supplier" />
+                <div class="flex flex-col md:flex-row items-center gap-3 w-full xl:w-auto">
+                    <!-- Pencarian -->
+                    <div class="relative w-full md:w-64">
+                        <i class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                        <input type="text" v-model="cari" placeholder="Cari nomor/supplier"
+                            class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-slate-900 text-slate-700" />
                     </div>
 
-                    <div class="flex bg-gray-100 p-1 rounded-lg">
-                        <button v-for="t in saringan" :key="t.id" @click="saringStatus = t.id"
-                            class="px-3 py-1.5 text-xs font-semibold rounded-md transition-all"
-                            :class="saringStatus === t.id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'">
-                            {{ t.label }}
+                    <!-- Tab Status -->
+                    <div class="flex bg-slate-50 p-1 rounded-xl w-full md:w-auto overflow-x-auto custom-scrollbar">
+                        <button v-for="tab in ['semua', 'DRAFT', 'TERKIRIM', 'SEBAGIAN', 'SELESAI', 'BATAL']" :key="tab"
+                            @click="saringStatus = tab.toLowerCase()"
+                            :class="saringStatus === tab.toLowerCase() ? 'bg-white text-slate-800 shadow-[0_2px_8px_rgba(0,0,0,0.04)] font-bold' : 'text-slate-500 hover:text-slate-700'"
+                            class="px-3 py-1.5 text-xs rounded-lg transition-all whitespace-nowrap capitalize">
+                            {{ tab.toLowerCase() }}
                         </button>
                     </div>
                 </div>
             </div>
 
-            <div v-if="isLoadingDaftar" class="p-8 text-center text-gray-500 text-sm">
-                <i class="pi pi-spin pi-spinner mr-2"></i> Membaca purchase order...
+            <!-- Loading State -->
+            <div v-if="isLoadingDaftar" class="flex flex-col items-center justify-center py-12 text-center">
+                <i class="pi pi-spin pi-spinner text-slate-300 text-2xl mb-3"></i>
+                <p class="text-xs text-slate-500">Memuat data...</p>
             </div>
 
-            <div v-else-if="tampil.length" class="flex flex-col">
-                <router-link v-for="po in tampil" :key="po.id" :to="`/accounting/po/${po.id}`"
-                    class="grid grid-cols-1 md:grid-cols-[1fr_auto_auto] gap-4 items-center p-5 border-b border-gray-100 hover:bg-gray-50 transition-colors last:border-b-0">
-
-                    <div>
-                        <p class="text-sm font-bold text-gray-900 mb-1">{{ po.no_po }}</p>
-                        <p class="text-xs text-gray-500">
-                            {{ po.suplier_nama || 'Suplier' }} &bull; {{ po.entitas_kode || 'Entitas' }}
-                        </p>
-                    </div>
-
-                    <div class="flex flex-wrap gap-2 md:col-span-full lg:col-span-1">
-                        <span class="px-2.5 py-1 rounded text-[10px] font-bold tracking-wide uppercase"
-                            :class="kelasStatus(po.status)">
-                            {{ labelStatus(po.status) }}
-                        </span>
-                    </div>
-
-                    <div class="text-right">
-                        <p class="text-sm font-bold text-gray-900">{{ formatRupiah(po.total_nilai) }}</p>
-                        <p class="text-xs text-gray-500 mt-1">{{ tanggalPendek(po.tanggal) }}</p>
-                    </div>
-                </router-link>
-            </div>
-
-            <div v-else class="p-12 text-center">
-                <div
-                    class="w-12 h-12 bg-gray-100 text-gray-400 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <i class="pi pi-inbox text-xl"></i>
+            <!-- Empty State -->
+            <div v-else-if="tampil.length === 0" class="flex flex-col items-center justify-center py-12 text-center">
+                <div class="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mb-3">
+                    <i class="pi pi-inbox text-slate-400 text-xl"></i>
                 </div>
-                <h3 class="text-sm font-bold text-gray-900">Tidak ada PO yang cocok</h3>
-                <p class="text-xs text-gray-500 mt-1">Ubah kata kunci pencarian atau tab status.</p>
+                <h4 class="text-sm font-bold text-slate-800 mb-1">Tidak ada PO yang cocok</h4>
+                <p class="text-xs text-slate-500">Ubah kata kunci pencarian atau tab status.</p>
             </div>
-        </section>
+
+            <!-- Tabel Data -->
+            <div v-else class="overflow-x-auto">
+                <table class="w-full text-left text-sm table-fixed">
+                    <thead class="text-slate-500 bg-slate-50/50">
+                        <tr>
+                            <th class="py-3 px-4 font-semibold rounded-tl-xl w-[25%]">No. PO</th>
+                            <th class="py-3 px-4 font-semibold w-[15%]">Tanggal</th>
+                            <th class="py-3 px-4 font-semibold w-[25%]">Supplier</th>
+                            <th class="py-3 px-4 font-semibold w-[15%] text-right">Total Nilai</th>
+                            <th class="py-3 px-4 font-semibold w-[15%] text-center rounded-tr-xl">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="po in tampil" :key="po.id"
+                            class="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
+                            <td class="py-3 px-4 font-bold text-slate-800">{{ po.no_po || po.nomor }}</td>
+                            <td class="py-3 px-4 text-slate-600">{{ po.tanggal }}</td>
+                            <td class="py-3 px-4 text-slate-700 truncate" :title="po.suplier_nama">{{ po.suplier_nama }}
+                            </td>
+                            <td class="py-3 px-4 font-semibold text-slate-800 text-right">Rp {{ (Number(po.total_nilai)
+                                || 0).toLocaleString('id-ID') }}</td>
+                            <td class="py-3 px-4 text-center">
+                                <span :class="badgeColor(po.status)"
+                                    class="px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wide uppercase">
+                                    {{ po.status }}
+                                </span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 </template>
 
 <script setup>
 import { onMounted } from 'vue'
+// Pastikan path ini menunjuk ke composable yang benar
 import { usePurchaseOrder } from '@/features/accounting/composables/usePurchaseOrder'
 
 const {
-    daftarPO, tampil, isLoadingDaftar, cari, saringStatus,
+    daftarPO, isLoadingDaftar, cari, saringStatus, tampil,
     belumDiterima, draftCount, totalBulanIni, muatDaftarPO
 } = usePurchaseOrder()
 
-onMounted(muatDaftarPO)
+onMounted(() => {
+    muatDaftarPO()
+})
 
-// Status backend: DRAFT, TERKIRIM, SEBAGIAN, SELESAI, BATAL.
-const saringan = [
-    { id: 'semua', label: 'Semua' },
-    { id: 'DRAFT', label: 'Draft' },
-    { id: 'TERKIRIM', label: 'Terkirim' },
-    { id: 'SEBAGIAN', label: 'Sebagian' },
-    { id: 'SELESAI', label: 'Selesai' },
-    { id: 'BATAL', label: 'Batal' },
-]
-
-const formatRupiah = (n) => `Rp ${Number(n || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}`
-
-const formatNilaiBesar = (n) => {
-    const a = Number(n || 0)
-    if (Math.abs(a) >= 1e9) return `Rp ${(a / 1e9).toFixed(2)} M`
-    if (Math.abs(a) >= 1e6) return `Rp ${(a / 1e6).toFixed(1)} jt`
-    return formatRupiah(a)
+const badgeColor = (status) => {
+    const st = String(status).toUpperCase()
+    if (st === 'DRAFT') return 'bg-slate-100 text-slate-600'
+    if (st === 'TERKIRIM') return 'bg-blue-50 text-blue-600'
+    if (st === 'SEBAGIAN') return 'bg-amber-50 text-amber-600'
+    if (st === 'SELESAI') return 'bg-emerald-50 text-emerald-600'
+    if (st === 'BATAL') return 'bg-red-50 text-red-600'
+    return 'bg-slate-100 text-slate-600'
 }
-
-const tanggalPendek = (iso) => {
-    if (!iso) return '-'
-    return new Date(iso).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
-}
-
-const labelStatus = (s) => ({
-    DRAFT: 'Draft',
-    TERKIRIM: 'Terkirim',
-    SEBAGIAN: 'Diterima sebagian',
-    SELESAI: 'Selesai',
-    BATAL: 'Dibatalkan',
-}[s] ?? (s || 'Status?'))
-
-const kelasStatus = (s) => ({
-    DRAFT: 'bg-gray-100 text-gray-600',
-    TERKIRIM: 'bg-blue-100 text-blue-700',
-    SEBAGIAN: 'bg-amber-100 text-amber-700',
-    SELESAI: 'bg-emerald-100 text-emerald-700',
-    BATAL: 'bg-rose-100 text-rose-700',
-}[s] ?? 'bg-gray-100 text-gray-500')
 </script>
+
+<style scoped>
+.animate-fade-in {
+    animation: fadeIn 0.3s ease-out forwards;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+    height: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+</style>

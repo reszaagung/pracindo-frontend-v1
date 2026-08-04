@@ -3,25 +3,24 @@
  * =================
  * Proteksi rute berdasarkan Data-Driven UI dari backend.
  * Menggunakan kembalian modul dari /api/auth/login/.
+ *
+ * Guard ini TIDAK menyimpan aturan peran apa pun. Satu-satunya sumber izin
+ * adalah `auth.bisaAkses()`, yang membaca daftar modul kiriman backend.
+ * Rute pendaratan juga tidak lagi ditulis di sini — diambil dari katalog
+ * lewat `rutePertamaSiap()`, supaya path yang berubah cukup disunting di
+ * satu file (pernah kena 404 waktu path akunting bergeser).
  */
 
 import { useAuth } from '@/composables/useAuth'
+import { rutePertamaSiap } from '@/config/modules'
 
 export const useGuards = (router) => {
-  router.beforeEach((to, from) => {
+  router.beforeEach((to) => {
     const auth = useAuth()
 
     if (to.meta?.publik) {
       if (auth.masuk.value && (to.name === 'login' || to.name === 'register')) {
-        const daftarModul = auth.modul.value.map(m => m.kode)
-
-        if (daftarModul.includes('akunting')) {
-          return { path: '/accounting' }
-        } else if (daftarModul.includes('warehouse')) {
-          return { path: '/warehouse' }
-        }
-
-        return { name: 'dashboard' }
+        return rutePertamaSiap(auth.modul.value) ?? { name: 'dashboard' }
       }
       return true
     }
@@ -31,8 +30,11 @@ export const useGuards = (router) => {
     }
 
     if (to.meta?.modul && !auth.bisaAkses(to.meta.modul)) {
-      alert('Akses Ditolak: Anda tidak memiliki wewenang untuk membuka modul ini.')
-      return from.name ? false : { name: 'dashboard' }
+      // Dialihkan ke halaman, bukan kotak peringatan browser lalu
+      // `return false`. `return false` membatalkan navigasi tanpa jejak:
+      // pengguna mengklik sesuatu dan tidak terjadi apa-apa, tanpa
+      // penjelasan apa pun.
+      return { name: 'akses-ditolak', query: { modul: to.meta.modul } }
     }
 
     return true

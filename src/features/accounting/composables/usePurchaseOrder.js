@@ -2,12 +2,6 @@ import { ref, computed } from 'vue'
 import api from '@/utils/api'
 import { bacaError } from '@/utils/error'
 
-// Helper bulan romawi (diletakkan di luar fungsi agar lebih hemat memori)
-const getBulanRomawi = (dateObj) => {
-    const romawi = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"]
-    return romawi[dateObj.getMonth()]
-}
-
 export function usePurchaseOrder() {
     // ==========================================
     // STATE UNTUK DAFTAR PO (LIST VIEW)
@@ -97,47 +91,28 @@ export function usePurchaseOrder() {
     }
 
     /**
-     * Preview nomor PO dirakit di frontend.
+     * Nomor PO dirakit backend, bukan frontend — CounterDokumen.format_nomor
+     * sudah menyertakan prefix entitas, tahun, bulan romawi, dan urutan.
+     * GET akunting/purchase-order/preview-nomor/?entitas=&tanggal= -> { nomor, catatan }
      */
     const muatPreviewNomor = async (entitasId, tanggal) => {
         if (!entitasId || !tanggal) {
             previewNomor.value = 'Pilih entitas & tanggal'
             return
         }
-
-        const entitas = listEntitas.value.find(e => e.id === entitasId)
-        const kodeEntitas = entitas ? entitas.kode.toUpperCase() : ''
-
-        const prefixMap = {
-            'PT': 'PCJM',
-            'CV': 'CV',
-            'MARSINI': 'MRS',
-            'AGUS': 'AGS'
-        }
-
-        const kodePrefix = prefixMap[kodeEntitas] || kodeEntitas || 'PCJM'
-        const dateObj = new Date(tanggal)
-
         try {
-            const response = await api.get('akunting/purchase-order/generate-id/', {
-                params: { entitas: entitasId, tanggal: tanggal }
+            const { data } = await api.get('akunting/purchase-order/preview-nomor/', {
+                params: { entitas: entitasId, tanggal }
             })
-
-            const nomorUrut = response.data?.urutan || '000'
-            const tahun = dateObj.getFullYear()
-            const bulanRomawi = getBulanRomawi(dateObj)
-
-            previewNomor.value = `PO/${kodePrefix}/${tahun}/${bulanRomawi}/${nomorUrut}`
-        } catch (err) {
-            console.error(`Gagal men-generate ID PO untuk entitas ID ${entitasId}:`, err)
-            const tahun = dateObj.getFullYear()
-            const bulanRomawi = getBulanRomawi(dateObj)
-            previewNomor.value = `PO/${kodePrefix}/${tahun}/${bulanRomawi}/XXX`
+            previewNomor.value = data.nomor || 'TIDAK TERSEDIA'
+        } catch {
+            previewNomor.value = 'GAGAL MEMUAT NOMOR'
         }
     }
 
     /**
-     * Mengecek status periode akuntansi berdasarkan Entitas dan Tanggal
+     * GET core/periode/status/?entitas=&tanggal= -> { terbuka: bool, tanggal, pesan? }
+     * `pesan` cuma dikirim backend saat periode tertutup.
      */
     const cekStatusPeriode = async (entitasId, tanggal) => {
         if (!entitasId || !tanggal) {
@@ -147,19 +122,15 @@ export function usePurchaseOrder() {
 
         try {
             const { data } = await api.get('core/periode/status/', {
-                params: { entitas: entitasId, tanggal: tanggal }
+                params: { entitas: entitasId, tanggal }
             })
-
-            // Sesuaikan properti response dengan API aktual (misal: data.status, data.is_closed, dll)
-            const status = data.status || data.kondisi
-            periodeDitutup.value = (status === 'DITUTUP' || status === 'tutup' || data.is_closed === true)
-
+            periodeDitutup.value = !data.terbuka
             if (periodeDitutup.value) {
-                pesanError.value = '' // Bersihkan pesan error lain agar UI fokus ke peringatan periode
+                pesanError.value = data.pesan || 'Periode akuntansi untuk entitas & tanggal ini sudah ditutup.'
             }
         } catch (err) {
             console.error('Gagal mengecek status periode:', err)
-            // Fallback: anggap terbuka jika API gagal, agar form tidak terblokir permanen oleh error jaringan
+            // Fallback: anggap terbuka kalau API gagal, supaya form tidak terblokir permanen oleh error jaringan.
             periodeDitutup.value = false
         }
     }

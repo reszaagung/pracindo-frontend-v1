@@ -24,10 +24,7 @@ const routes = [
   },
 
   // ==========================================
-  // MODUL AKUNTING (Telah dibungkus ModulLayout)
-  // ==========================================
-  // ==========================================
-  // MODUL AKUNTING (Halaman Dasar)
+  // MODUL INPUT ENTRY (Akunting)
   // ==========================================
   {
     path: '/accounting',
@@ -37,30 +34,50 @@ const routes = [
       {
         path: '',
         name: 'accounting-landing',
-        // Tetap redirect ke PO jika user mengklik menu Akunting
-        redirect: '/accounting/transaksi/po'
+        redirect: '/accounting/input/po'
+      }
+    ]
+  },
+  {
+    path: '/accounting/input',
+    meta: { perluLogin: true, modul: 'akunting' },
+    component: () => import('@/features/accounting/layout/TransactionEntryLayout.vue'),
+    children: [
+      {
+        path: '',
+        redirect: '/accounting/input/po'
+      },
+      {
+        path: 'po',
+        name: 'transaksi-po-list',
+        component: () => import('@/features/accounting/views/PurchaseOrderList.vue')
+      },
+      {
+        path: 'po/buat',
+        name: 'transaksi-po',
+        component: () => import('@/features/accounting/views/ProcurementCreate.vue')
       }
     ]
   },
 
   // ==========================================
-  // LAYOUT TRANSAKSI PO (Berdiri Sendiri)
+  // BUKU TAGIHAN — sub-area modul akunting
+  // Backend tidak punya modul 'buku_tagihan' (bukan key AKSES_MODUL), jadi
+  // meta.modul-nya WAJIB 'akunting'. Child mewarisi meta ini dari induknya.
   // ==========================================
   {
-    path: '/accounting/transaksi/po',
+    path: '/accounting/invoice',
     meta: { perluLogin: true, modul: 'akunting' },
-    // Dikeluarkan dari ModulLayout, kembali menggunakan layout khususnya sendiri
-    component: () => import('@/features/accounting/layout/TransactionEntryLayout.vue'),
+    component: () => import('@/features/accounting/layout/InvoiceLayout.vue'),
     children: [
       {
         path: '',
-        name: 'transaksi-po-list',
-        component: () => import('@/features/accounting/views/PurchaseOrderList.vue')
+        redirect: '/accounting/invoice/dokumen'
       },
       {
-        path: 'buat',
-        name: 'transaksi-po',
-        component: () => import('@/features/accounting/views/PurchaseOrderForm.vue')
+        path: 'dokumen',
+        name: 'accounting-invoice-dokumen',
+        component: () => import('@/features/accounting/views/DocumentAuditView.vue')
       }
     ]
   },
@@ -141,12 +158,85 @@ const routes = [
   },
 
   // ==========================================
+  // MODUL PRODUKSI / R&D
+  // Semua navigasi di dalam modul ini memakai NAMED ROUTE — path string
+  // yang di-hardcode sudah dua kali menghasilkan 404 di modul lain.
+  // ==========================================
+  {
+    path: '/produksi',
+    meta: { perluLogin: true, modul: 'produksi' },
+    component: ModulLayout,
+    children: [
+      {
+        path: '',
+        name: 'produksi-sesi-list',
+        component: () => import('@/features/produksi/views/SesiList.vue')
+      },
+      {
+        path: 'sesi/buat',
+        name: 'produksi-sesi-buat',
+        component: () => import('@/features/produksi/views/SesiForm.vue')
+      },
+      {
+        path: 'sesi/:id',
+        name: 'produksi-sesi-detail',
+        component: () => import('@/features/produksi/views/SesiDetail.vue'),
+        props: true
+      },
+      {
+        path: 'sesi/:id/kerja',
+        name: 'produksi-sesi-berjalan',
+        component: () => import('@/features/produksi/views/SesiBerjalan.vue'),
+        props: true
+      },
+      {
+        path: 'banding',
+        name: 'produksi-banding',
+        component: () => import('@/features/produksi/views/BandingBatch.vue')
+      }
+    ]
+  },
+
+  // ==========================================
+  // MODUL YANG DIKIRIM BACKEND TAPI LAYARNYA BELUM ADA
+  // Rute tetap digerbangi meta.modul supaya perilakunya sama dengan modul
+  // lain begitu layar aslinya dibangun.
+  // ==========================================
+  {
+    path: '/work-order',
+    name: 'work-order',
+    meta: { perluLogin: true, modul: 'work_order' },
+    component: () => import('@/views/ModulBelumSiap.vue')
+  },
+  {
+    path: '/dokumen',
+    name: 'dokumen',
+    meta: { perluLogin: true, modul: 'dokumen' },
+    component: () => import('@/views/ModulBelumSiap.vue')
+  },
+
+  // ==========================================
+  // AKSES DITOLAK
+  // SENGAJA tanpa meta.modul: kalau punya, guard menolak halaman ini juga
+  // dan redirect-nya berputar tanpa henti.
+  // ==========================================
+  {
+    path: '/akses-ditolak',
+    name: 'akses-ditolak',
+    meta: { perluLogin: true },
+    component: () => import('@/views/AksesDitolak.vue')
+  },
+
+  // ==========================================
   // FALLBACK 404
+  // Sengaja BUKAN redirect ke '/': rute mati harus kelihatan mati, bukan
+  // menyamar jadi "kembali ke dashboard".
   // ==========================================
   {
     path: '/:pathMatch(.*)*',
     name: 'NotFound',
-    redirect: '/'
+    meta: { perluLogin: true },
+    component: () => import('@/views/NotFound.vue')
   }
 ]
 

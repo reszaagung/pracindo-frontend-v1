@@ -1,22 +1,41 @@
 /**
  * src/config/modules.js
  * ======================
- * Katalog UI SAJA. Karena backend tidak mengembalikan hak akses dengan benar,
- * penentuan akses di-override di frontend menggunakan properti `roles`.
+ * Katalog UI SAJA. Siapa yang boleh masuk modul apa ditentukan backend lewat
+ * GET auth/portal/ (lihat useAuth().modul) — file ini tidak menyimpan aturan
+ * peran, hanya bagaimana modul itu tampil (ikon, label, menu, status siap).
  */
 
 export const MODUL = [
   {
     id: 'akunting',
-    nama: 'Akunting',
+    nama: 'Input Entry',
     ringkas: 'Purchase order, faktur, dan pembayaran',
     ikon: 'buku',
-    rute: '/accounting',
+    rute: '/accounting/input',
     siap: true,
-    roles: ['AKUNTAN', 'SUPERVISOR'], // Ditambahkan
     menu: [
-      { label: 'Portal Akunting', rute: '/accounting' },
-      { label: 'Pembelian (PO)', rute: '/accounting/transaksi/po' },
+      { label: 'Purchase Order', rute: '/accounting/input/po' },
+      { label: 'Pengeluaran', rute: '/accounting/input/expend' },
+    ],
+  },
+  {
+    id: 'buku_tagihan',
+    nama: 'Buku Tagihan',
+    ringkas: 'Manajemen invoice, dokumen, dan catatan pengeluaran',
+    ikon: 'transaksi',
+    rute: '/accounting/invoice',
+    siap: true,
+    // KARTU TURUNAN, bukan modul backend. `buku_tagihan` tidak ada di
+    // AKSES_MODUL — backend tidak pernah mengirimnya, jadi entri ini tidak
+    // akan pernah keluar dari modulDariBackend(). Otorisasinya menumpang
+    // modul induk: rute /accounting/invoice memakai meta.modul 'akunting',
+    // dan kartunya baru muncul kalau 'akunting' ada di modul user.
+    // Jangan pernah memakai id ini sebagai meta.modul — itu mengunci semua
+    // orang keluar (bisaAkses selalu false).
+    indukModul: 'akunting',
+    menu: [
+      { label: 'Dokumen', rute: '/accounting/invoice/dokumen' },
     ],
   },
   {
@@ -26,7 +45,6 @@ export const MODUL = [
     ikon: 'gudang',
     rute: '/warehouse',
     siap: true,
-    roles: ['GUDANG', 'SUPERVISOR'], // Ditambahkan
     menu: [
       { label: 'Penerimaan Barang', rute: '/warehouse' },
       { label: 'Laporan Selisih', rute: '/warehouse/selisih' },
@@ -39,7 +57,6 @@ export const MODUL = [
     ikon: 'master',
     rute: '/master/suplier',
     siap: true,
-    roles: ['GUDANG', 'AKUNTAN', 'SUPERVISOR'], // Ditambahkan
     menu: [
       { label: 'Suplier', rute: '/master/suplier' },
     ],
@@ -47,13 +64,14 @@ export const MODUL = [
   {
     id: 'produksi',
     nama: 'Produksi',
-    ringkas: 'Resep dan sesi produksi',
+    ringkas: 'Sesi produksi rutin dan percobaan R&D',
     ikon: 'produksi',
     rute: '/produksi',
-    siap: false,
-    catatan: 'Endpoint backend belum ada',
-    roles: ['PRODUKSI', 'SUPERVISOR'], // Ditambahkan
-    menu: [],
+    siap: true,
+    menu: [
+      { label: 'Sesi', rute: '/produksi' },
+      { label: 'Banding Batch', rute: '/produksi/banding' },
+    ],
   },
   {
     id: 'logistik',
@@ -63,7 +81,6 @@ export const MODUL = [
     rute: '/logistik',
     siap: false,
     catatan: 'Belum dibangun backend maupun frontend',
-    roles: ['GUDANG', 'SUPERVISOR'], // Ditambahkan
     menu: [],
   },
   {
@@ -74,18 +91,6 @@ export const MODUL = [
     rute: '/sales-order',
     siap: false,
     catatan: 'Belum dibangun backend maupun frontend',
-    roles: ['SALES', 'SUPERVISOR'], // Ditambahkan
-    menu: [],
-  },
-  {
-    id: 'work_order',
-    nama: 'Work Order',
-    ringkas: 'Papan tugas antar staf',
-    ikon: 'transaksi',
-    rute: '/work-order',
-    siap: false,
-    catatan: 'Belum dimodelkan di backend',
-    roles: ['GUDANG', 'AKUNTAN', 'PRODUKSI', 'SALES', 'STAFF', 'SUPERVISOR'], // Ditambahkan
     menu: [],
   },
   {
@@ -95,7 +100,7 @@ export const MODUL = [
     ikon: 'gudang',
     rute: '/inventory',
     siap: true,
-    roles: ['GUDANG', 'SUPERVISOR'], // Ditambahkan
+    sembunyiDiDashboardUntuk: ['AKUNTING'],
     menu: [
       { label: 'Stok', rute: '/inventory' },
       { label: 'Monitor Tangki', rute: '/inventory/tangki' },
@@ -109,29 +114,47 @@ export const MODUL = [
     rute: '/keuangan',
     siap: false,
     catatan: 'Sebagian lewat modul akunting, layar sendiri belum ada',
-    roles: ['AKUNTAN', 'SUPERVISOR'], // Ditambahkan
     menu: [],
   },
   {
-    id: 'pajak',
-    nama: 'Pajak',
-    ringkas: 'Faktur pajak',
-    ikon: 'buku',
-    rute: '/pajak',
+    id: 'staff_user',
+    nama: 'Pengguna',
+    ringkas: 'Kelola akun dan persetujuan staf',
+    ikon: 'master',
+    rute: '/pengguna',
     siap: false,
-    catatan: 'Belum dimodelkan di backend',
-    roles: ['AKUNTAN', 'SUPERVISOR'], // Ditambahkan
+    catatan: 'Layar belum dibangun',
+    menu: [],
+  },
+  {
+    id: 'work_order',
+    nama: 'Papan Tugas',
+    ringkas: 'Tugas dan penugasan antar staf',
+    ikon: 'transaksi',
+    rute: '/work-order',
+    siap: false,
+    catatan: 'Endpoint backend belum ada',
     menu: [],
   },
   {
     id: 'dokumen',
     nama: 'Dokumen',
-    ringkas: 'Lampiran surat jalan dan berkas lain',
-    ikon: 'master',
+    ringkas: 'Arsip dan audit dokumen',
+    ikon: 'buku',
     rute: '/dokumen',
     siap: false,
     catatan: 'Endpoint backend belum ada',
-    roles: ['GUDANG', 'AKUNTAN', 'SUPERVISOR'], // Ditambahkan
+    menu: [],
+  },
+  {
+    id: 'dashboard',
+    nama: 'Dashboard',
+    ringkas: 'Halaman ini sendiri',
+    ikon: 'panah',
+    rute: '/',
+    siap: false,
+    catatan: 'Kamu sudah di sini',
+    sembunyiDiDashboard: true,
     menu: [],
   },
 ]
@@ -143,15 +166,48 @@ export const modulDariBackend = (modulBackend = []) =>
     const lokal = cariModul(mb.kode)
     return {
       id: mb.kode,
-      nama: mb.label ?? lokal?.nama ?? mb.kode,
-      ikon: mb.ikon || lokal?.ikon || 'master',
-      rute: mb.rute || lokal?.rute || '/',
+      nama: lokal?.nama ?? mb.label ?? mb.kode,
+      // Perlakuan ikon dan rute SENGAJA berbeda, jangan diseragamkan:
+      // - ikon local-first tanpa fallback backend, karena backend mengirim
+      //   nama PrimeIcons ('pi-book') sedangkan BaseIcon memakai kunci SVG
+      //   sendiri ('buku') — nilai backend tidak akan pernah ter-render.
+      // - rute boleh jatuh ke milik backend: untuk modul yang belum ada di
+      //   katalog, rute backend jauh lebih berguna daripada '/' (yang
+      //   memutar kartu balik ke dashboard).
+      ikon: lokal?.ikon || 'master',
+      rute: lokal?.rute || mb.rute || '/',
       ringkas: lokal?.ringkas ?? '',
       catatan: lokal?.catatan ?? '',
       siap: lokal?.siap ?? false,
+      sembunyiDiDashboardUntuk: lokal?.sembunyiDiDashboardUntuk || [],
+      sembunyiDiDashboard: lokal?.sembunyiDiDashboard || false,
       menu: lokal?.menu ?? [],
     }
   })
+
+/**
+ * Rute pendaratan setelah login: modul PERTAMA yang siap dan bukan kartu
+ * tersembunyi. Dipakai guards.js dan LoginView.vue — dua tempat yang dulu
+ * sama-sama meng-hardcode '/accounting' lalu '/warehouse'.
+ *
+ * Urutannya mengikuti urutan entri di MODUL, BUKAN urutan kiriman backend.
+ * Jadi mengubah prioritas pendaratan = memindahkan entri di file ini, bukan
+ * menambah if-else di guard. Itu juga sebabnya rute tidak boleh ditulis
+ * ulang di guard: pernah kena 404 waktu path akunting berubah.
+ *
+ * @returns {string|null} path, atau null kalau tidak ada modul yang siap
+ */
+export const rutePertamaSiap = (modulBackend = []) => {
+  const urutan = (m) => {
+    const i = MODUL.findIndex((k) => k.id === m.id)
+    return i === -1 ? Number.MAX_SAFE_INTEGER : i
+  }
+  const siap = modulDariBackend(modulBackend)
+    .filter((m) => m.siap && !m.sembunyiDiDashboard)
+    .sort((a, b) => urutan(a) - urutan(b))
+
+  return siap[0]?.rute ?? null
+}
 
 export const IKON = {
   transaksi: '<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/>',
