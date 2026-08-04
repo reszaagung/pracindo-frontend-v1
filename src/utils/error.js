@@ -37,13 +37,12 @@ const LABEL_FIELD = {
 }
 
 /**
- * @param {Error} err        error dari axios
- * @param {string} fallback  pesan kalau tidak ada yang bisa dibaca
+ * @param {Error} err    
+ * @param {string} fallback  
  * @returns {string}
  */
 export const bacaError = (err, fallback = 'Terjadi kesalahan.') => {
   if (!err?.response) {
-    // Tidak ada respons sama sekali: server mati, CORS, atau koneksi putus.
     return 'Tidak bisa menghubungi server. Cek koneksi.'
   }
 

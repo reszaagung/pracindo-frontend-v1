@@ -14,11 +14,21 @@
                         class="bg-slate-200 text-slate-700 text-[10px] font-bold px-2.5 py-1 rounded-full tracking-wide">DRAFT</span>
                 </div>
             </div>
-            <!-- Tombol Trigger Modal Tambah Suplier -->
-            <button type="button" @click="showModalSupplier = true"
-                class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-colors flex items-center gap-2 shadow-sm transform hover:-translate-y-0.5">
-                <i class="pi pi-plus"></i> Suplier Baru
-            </button>
+
+            <!-- Tombol Aksi di Kanan Atas -->
+            <div class="flex items-center gap-2">
+                <!-- Tombol Trigger Modal Tambah Produk -->
+                <button type="button" @click="showModalProduct = true"
+                    class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-colors flex items-center gap-2 shadow-sm transform hover:-translate-y-0.5">
+                    <i class="pi pi-plus"></i> Produk Baru
+                </button>
+
+                <!-- Tombol Trigger Modal Tambah Suplier -->
+                <button type="button" @click="showModalSupplier = true"
+                    class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-colors flex items-center gap-2 shadow-sm transform hover:-translate-y-0.5">
+                    <i class="pi pi-plus"></i> Suplier Baru
+                </button>
+            </div>
         </div>
 
         <!-- Notifikasi Error (Termasuk jika periode ditutup) -->
@@ -91,10 +101,16 @@
             <!-- Detail Item -->
             <div class="flex justify-between items-center mb-4 pb-2 mt-2">
                 <h3 class="text-sm md:text-base font-bold text-slate-800">Detail Item Pesanan</h3>
-                <button type="button" @click="tambahItem"
-                    class="px-3 py-2 md:px-4 md:py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 text-[10px] md:text-xs font-bold rounded-lg transition-colors flex items-center gap-2">
-                    <i class="pi pi-plus"></i> Tambah Item
-                </button>
+                <div class="flex gap-2">
+                    <button type="button" @click="showModalProduct = true"
+                        class="px-3 py-2 md:px-4 md:py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 text-[10px] md:text-xs font-bold rounded-lg transition-colors flex items-center gap-2">
+                        <i class="pi pi-box"></i> Produk Baru
+                    </button>
+                    <button type="button" @click="tambahItem"
+                        class="px-3 py-2 md:px-4 md:py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 text-[10px] md:text-xs font-bold rounded-lg transition-colors flex items-center gap-2">
+                        <i class="pi pi-plus"></i> Tambah Item
+                    </button>
+                </div>
             </div>
 
             <div class="w-full mb-8">
@@ -112,20 +128,35 @@
                         <tr v-for="(item, index) in draf.items" :key="index"
                             class="block md:table-row bg-white border border-slate-200 md:border-b md:border-x-0 md:border-t-0 md:border-slate-100 rounded-2xl md:rounded-none mb-6 md:mb-0 p-4 md:p-0 shadow-sm md:shadow-none relative transition-colors">
 
-                            <!-- Kolom Produk dg AutoComplete -->
+                            <!-- Kolom Produk dg Dropdown Katalog Suplier -->
                             <td class="block md:table-cell md:py-3 md:px-2 mb-3 md:mb-0">
                                 <label class="md:hidden text-xs font-bold text-slate-500 mb-1 block">Produk</label>
-                                <AutoComplete v-model="item.produk" :suggestions="saranProduk" optionLabel="label"
-                                    placeholder="Ketik nama produk..." class="w-full" :pt="{
-                                        root: { class: 'w-full' },
-                                        input: { class: 'w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 text-slate-800' }
-                                    }" fluid forceSelection @complete="cariProdukUntukForm"
-                                    @item-select="pilihProduk(item, $event)">
-                                    <template #option="{ option }">
-                                        <span :class="option.baru ? 'text-emerald-600 font-bold' : 'text-slate-700'">{{
-                                            option.label }}</span>
+                                <Dropdown v-model="item.produk" :options="produkBerdasarkanSuplier" optionLabel="label"
+                                    :placeholder="draf.suplier_id ? 'Pilih atau cari produk...' : 'Pilih supplier dulu'"
+                                    class="w-full" :disabled="!draf.suplier_id" filter :pt="{
+                                        root: { class: 'w-full h-[42px] md:h-[38px] bg-slate-50 border border-slate-200 rounded-lg flex items-center' }
+                                    }">
+                                    <template #value="slotProps">
+                                        <span v-if="slotProps.value" class="text-sm text-slate-800">{{
+                                            slotProps.value.label }}</span>
+                                        <span v-else class="text-sm text-slate-400">
+                                            {{ slotProps.placeholder }}
+                                        </span>
                                     </template>
-                                </AutoComplete>
+                                    <template #option="slotProps">
+                                        <span class="text-sm text-slate-700">{{ slotProps.option.label }}</span>
+                                    </template>
+                                    <template #empty>
+                                        <div class="flex flex-col items-center justify-center p-4 text-center">
+                                            <span class="text-sm text-slate-500 mb-3">Suplier ini belum memiliki produk
+                                                di katalog.</span>
+                                            <button type="button" @click="showModalProduct = true"
+                                                class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2">
+                                                <i class="pi pi-plus text-[10px]"></i> Buat Produk Baru
+                                            </button>
+                                        </div>
+                                    </template>
+                                </Dropdown>
                             </td>
 
                             <td class="block md:table-cell md:py-3 md:px-2 mb-3 md:mb-0">
@@ -194,34 +225,30 @@
             </div>
         </form>
 
-        <!-- Komponen SupplierForm Diambil Dari Folder Master -->
+        <!-- Modals -->
         <SupplierForm v-if="showModalSupplier" @close="showModalSupplier = false" @saved="handleSupplierSaved" />
+        <ProductEntry v-if="showModalProduct" @close="showModalProduct = false" @saved="handleProductSaved" />
     </div>
 </template>
 
 <script setup>
 import { reactive, computed, ref, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import AutoComplete from 'primevue/autocomplete'
-import { useAuth } from '@/composables/useAuth'
-import { bacaError } from '@/utils/error'
+import Dropdown from 'primevue/dropdown'
 
-// Import komponen form suplier secara langsung dari modul master data
 import SupplierForm from '@/features/master/views/SupplierForm.vue'
+import ProductEntry from '@/features/master/views/ProductEntry.vue'
 
 import { usePurchaseOrder } from '@/features/accounting/composables/usePurchaseOrder'
 
 const router = useRouter()
-const { profil } = useAuth()
 const {
     listEntitas, listSupplier, listProduk, sedangProses, pesanError, previewNomor,
-    periodeDitutup,
-    muatDataMaster, muatPreviewNomor, cariProduk, buatProdukBaru, simpanPO,
-    cekStatusPeriode
+    periodeDitutup, muatDataMaster, muatPreviewNomor, simpanPO, cekStatusPeriode
 } = usePurchaseOrder()
 
-const bisaBuatProduk = computed(() => ['ADMIN', 'SUPERVISOR'].includes(profil.value?.role))
 const showModalSupplier = ref(false)
+const showModalProduct = ref(false)
 
 const hariIni = () => {
     const t = new Date(Date.now() - new Date().getTimezoneOffset() * 60_000)
@@ -243,19 +270,30 @@ onMounted(async () => {
     await muatDataMaster()
     previewNomor.value = 'Pilih entitas & tanggal'
 
-    // Auto-select entitas pertama agar tombol pill UI langsung terlihat aktif
     if (listEntitas.value.length > 0) {
         draf.entitas_id = listEntitas.value[0].id
     }
 })
 
-// Ketika user berhasil menyimpan suplier dari modal
 const handleSupplierSaved = async () => {
     showModalSupplier.value = false
-    await muatDataMaster() // Perbarui list suplier di form
+    await muatDataMaster()
 }
 
-// Watcher untuk merakit nomor PO & cek periode berdasarkan entitas dan tanggal
+const handleProductSaved = async (produkBaru) => {
+    showModalProduct.value = false
+    await muatDataMaster()
+
+    const produkTerpilih = produkBerdasarkanSuplier.value.find(p => p.id === produkBaru.id)
+
+    if (produkTerpilih) {
+        const barisTerakhir = draf.items[draf.items.length - 1]
+        if (!barisTerakhir.produk) {
+            barisTerakhir.produk = produkTerpilih
+        }
+    }
+}
+
 watch([() => draf.entitas_id, () => draf.tanggal], async ([entitas, tanggal]) => {
     if (entitas && tanggal) {
         await Promise.all([
@@ -268,33 +306,20 @@ watch([() => draf.entitas_id, () => draf.tanggal], async ([entitas, tanggal]) =>
     }
 })
 
-// Logika AutoComplete Produk
-const saranProduk = ref([])
-const label = (p) => ({ ...p, label: `${p.kode} — ${p.nama}` })
-
-const cariProdukUntukForm = async (event) => {
-    const q = event.query?.trim() || ''
-    const hasil = (q ? await cariProduk(q) : listProduk.value).map(label)
-    const sudahAda = hasil.some(p => p.nama.toLowerCase() === q.toLowerCase())
-
-    saranProduk.value = (bisaBuatProduk.value && q && !sudahAda)
-        ? [...hasil, { baru: true, nama: q, label: `+ Buat produk baru: "${q}"` }]
-        : hasil
-}
-
-const pilihProduk = async (item, event) => {
-    const dipilih = event.value
-    if (!dipilih?.baru) return
-    pesanError.value = ''
-    try {
-        item.produk = label(await buatProdukBaru(dipilih.nama))
-    } catch (err) {
-        pesanError.value = bacaError(err, 'Gagal membuat produk baru.')
-        item.produk = null
+watch(() => draf.suplier_id, (newVal, oldVal) => {
+    if (oldVal && newVal !== oldVal) {
+        draf.items = [itemKosong()]
     }
-}
+})
 
-// Logika Kalkulasi
+const produkBerdasarkanSuplier = computed(() => {
+    if (!draf.suplier_id) return []
+
+    return listProduk.value
+        .filter(p => p.suplier && p.suplier.includes(draf.suplier_id))
+        .map(p => ({ ...p, label: `${p.kode} — ${p.nama}` }))
+})
+
 const subtotal = (item) => (Number(item.qty) || 0) * (Number(item.harga_per_kg) || 0)
 const subtotalSemua = computed(() => draf.items.reduce((s, i) => s + subtotal(i), 0))
 
@@ -303,14 +328,13 @@ const hapusItem = (i) => {
     if (draf.items.length > 1) draf.items.splice(i, 1)
 }
 
-// Eksekusi Submit
 const kirim = async () => {
     if (periodeDitutup.value) return
 
     pesanError.value = ''
     const kosong = draf.items.some(i => !i.produk?.id || !(Number(i.qty) > 0))
     if (kosong) {
-        pesanError.value = 'Setiap item butuh produk dan Qty (jumlah) minimal 1.'
+        pesanError.value = 'Setiap item butuh produk (yang valid) dan Qty minimal 1.'
         return
     }
 
@@ -320,7 +344,6 @@ const kirim = async () => {
         tanggal: draf.tanggal,
         tanggal_kirim_diminta: draf.tanggal_kirim_diminta || null,
         catatan: draf.catatan,
-        // Konversi key agar sesuai dengan API
         items: draf.items.map(i => ({
             produk_id: i.produk.id,
             qty_pesan: Number(i.qty) || 0,
@@ -329,7 +352,6 @@ const kirim = async () => {
         })),
     }
 
-    // Panggil simpanPO dengan flag isKirim = true
     const hasil = await simpanPO(payload, true)
 
     if (hasil.success) {

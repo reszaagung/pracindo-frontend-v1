@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: pracindo_db
+    restart: always
+    environment:
+      POSTGRES_DB: pracindo_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin123tupai455
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./pracindo_backend_v1
+    container_name: pracindo_backend
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - ./pracindo_backend_v1:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    environment:
+      - DB_NAME=pracindo_db
+      - DB_USER=postgres
+      - DB_PASSWORD=password123
+      - DB_HOST=db
+      - DB_PORT=5432
+
+  # 3. Frontend Vue.js
+  frontend:
+    build:
+      context: ./pracindo_frontend
+    container_name: pracindo_frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+volumes:
+  postgres_data:

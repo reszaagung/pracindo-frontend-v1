@@ -3,17 +3,12 @@ import api from '@/utils/api'
 import { bacaError } from '@/utils/error'
 
 export function usePurchaseOrder() {
-    // ==========================================
-    // STATE UNTUK DAFTAR PO (LIST VIEW)
-    // ==========================================
+
     const daftarPO = ref([])
     const isLoadingDaftar = ref(false)
     const cari = ref('')
     const saringStatus = ref('semua')
 
-    // ==========================================
-    // STATE UNTUK FORM PO (CREATE VIEW)
-    // ==========================================
     const listEntitas = ref([])
     const listSupplier = ref([])
     const listProduk = ref([])
@@ -22,12 +17,9 @@ export function usePurchaseOrder() {
     const pesanError = ref('')
     const previewNomor = ref('')
 
-    // State baru untuk status periode
     const periodeDitutup = ref(false)
 
-    // ==========================================
-    // LOGIKA DAFTAR PO
-    // ==========================================
+
     const muatDaftarPO = async () => {
         isLoadingDaftar.value = true
         try {
@@ -68,9 +60,6 @@ export function usePurchaseOrder() {
             .reduce((s, po) => s + Number(po.total_nilai ?? 0), 0)
     })
 
-    // ==========================================
-    // LOGIKA FORM PO
-    // ==========================================
     const muatDataMaster = async () => {
         sedangProses.value = true
         pesanError.value = ''
@@ -80,6 +69,7 @@ export function usePurchaseOrder() {
                 api.get('master/suplier/', { params: { ringkas: 1, aktif: true } }),
                 api.get('master/produk/', { params: { ringkas: 1, aktif: true, jenis: 'BAHAN_BAKU' } })
             ])
+
             listEntitas.value = resPortal.data.entitas || []
             listSupplier.value = resSupplier.data.results || resSupplier.data || []
             listProduk.value = resProduk.data.results || resProduk.data || []
@@ -130,7 +120,7 @@ export function usePurchaseOrder() {
             }
         } catch (err) {
             console.error('Gagal mengecek status periode:', err)
-            // Fallback: anggap terbuka kalau API gagal, supaya form tidak terblokir permanen oleh error jaringan.
+
             periodeDitutup.value = false
         }
     }
@@ -145,28 +135,76 @@ export function usePurchaseOrder() {
             return []
         }
     }
-
     const buatProdukBaru = async (nama) => {
-        const kode = `${nama.trim().toUpperCase().replace(/[^A-Z0-9]+/g, '-').slice(0, 16)}-${Date.now().toString(36).slice(-4).toUpperCase()}`
+        const namaProduk = nama.trim()
 
+        if (!namaProduk) {
+            throw new Error('Nama produk wajib diisi.')
+        }
+
+        // Pastikan master satuan sudah dimuat
         if (!listSatuan.value.length) {
-            const { data } = await api.get('master/satuan/')
+            const { data } = await api.get('master/satuan/', {
+                params: { aktif: true }
+            })
             listSatuan.value = data.results || data || []
         }
-        const satuanKg = listSatuan.value.find(s => s.kode === 'kg') || listSatuan.value[0]
-        if (!satuanKg) throw new Error('Belum ada data satuan di master.')
 
-        const { data: produk } = await api.post('master/produk/', {
-            kode,
-            nama: nama.trim(),
-            jenis: 'BAHAN_BAKU',
-            satuan: satuanKg.id,
-        })
-        return { id: produk.id, kode: produk.kode, nama: produk.nama, satuan_kode: produk.satuan_kode, jenis: produk.jenis }
+        const satuanKg =
+            listSatuan.value.find(
+                s => s.kode?.toLowerCase() === 'kg'
+            ) || listSatuan.value[0]
+
+        if (!satuanKg) {
+            throw new Error('Belum ada data satuan pada master.')
+        }
+
+        // Cek apakah produk sudah ada di list yang sudah dimuat
+        const produkLokal = listProduk.value.find(
+            p => p.nama.trim().toLowerCase() === namaProduk.toLowerCase()
+        )
+
+        if (produkLokal) {
+            return produkLokal
+        }
+
+        // Kode sementara (backend idealnya yang generate)
+        const kode =
+            `${namaProduk}`
+                .toUpperCase()
+                .replace(/[^A-Z0-9]+/g, '-')
+                .replace(/^-|-$/g, '')
+                .slice(0, 16) +
+            '-' +
+            Math.random().toString(36).substring(2, 6).toUpperCase()
+
+        try {
+            const { data } = await api.post('master/produk/', {
+                kode,
+                nama: namaProduk,
+                jenis: 'BAHAN_BAKU',
+                satuan: satuanKg.id
+            })
+
+            const produkBaru = {
+                id: data.id,
+                kode: data.kode,
+                nama: data.nama,
+                satuan_kode: data.satuan_kode,
+                jenis: data.jenis
+            }
+            listProduk.value.unshift(produkBaru)
+
+            return produkBaru
+
+        } catch (err) {
+            throw new Error(
+                bacaError(err, 'Gagal membuat produk baru.')
+            )
+        }
     }
 
     const simpanPO = async (form, isKirim = false) => {
-        // Validasi ekstra di level state
         if (periodeDitutup.value) {
             pesanError.value = 'Tidak dapat menyimpan PO karena periode telah ditutup.'
             return { success: false, message: pesanError.value }
@@ -216,8 +254,9 @@ export function usePurchaseOrder() {
         }
     }
 
+
+
     return {
-        // List Exports
         daftarPO, isLoadingDaftar, cari, saringStatus, tampil,
         belumDiterima, draftCount, totalBulanIni, muatDaftarPO,
         listEntitas, listSupplier, listProduk, sedangProses,
