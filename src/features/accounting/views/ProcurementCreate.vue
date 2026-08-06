@@ -210,7 +210,7 @@
                             class="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Grand
                             Total</span>
                         <span class="text-2xl font-black text-slate-800">Rp {{ (grandTotal).toLocaleString('id-ID')
-                        }}</span>
+                            }}</span>
                     </div>
 
                     <button type="submit" :disabled="sedangProses || periodeDitutup"
