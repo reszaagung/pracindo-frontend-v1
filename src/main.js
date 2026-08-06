@@ -7,6 +7,7 @@ import PrimeVue from 'primevue/config'
 import Aura from '@primevue/themes/aura'
 import 'primeicons/primeicons.css'
 import ToastService from 'primevue/toastservice'
+import Tooltip from 'primevue/tooltip' // <-- 1. Import Tooltip dari PrimeVue
 
 import '@/assets/tema.css'
 
@@ -31,5 +32,6 @@ app.use(PrimeVue, {
         }
     }
 })
+app.directive('tooltip', Tooltip)
 
 app.mount('#app')

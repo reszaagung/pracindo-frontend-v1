@@ -1,7 +1,7 @@
 <template>
     <div class="flex flex-col w-full animate-fade-in relative">
         <!-- Header -->
-        <div class="mb-4 md:mb-6 flex justify-between items-end">
+        <div class="mb-4 md:mb-6 flex flex-col md:flex-row justify-between items-start md:items-end gap-4 md:gap-0">
             <div>
                 <p class="text-xs text-slate-400 mb-1">
                     <router-link to="/" class="hover:text-slate-700 transition-colors">Dashboard</router-link> ›
@@ -15,15 +15,18 @@
                 </div>
             </div>
 
-            <!-- Tombol Aksi di Kanan Atas -->
-            <div class="flex items-center gap-2">
+            <!-- Tombol Aksi di Kanan Atas (Desain Pastel Pindahan dari Bawah) -->
+            <div class="flex flex-wrap items-center gap-2">
+
                 <button type="button" @click="showModalProduct = true"
-                    class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-colors flex items-center gap-2 shadow-sm transform hover:-translate-y-0.5">
-                    <i class="pi pi-plus"></i> Produk Baru
+                    class="px-3 py-2 md:px-4 md:py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 text-[10px] md:text-xs font-bold rounded-lg transition-colors flex items-center gap-2">
+                    <i class="pi pi-box"></i> Produk Baru
                 </button>
+
+                <!-- Suplier baru disesuaikan desainnya agar senada -->
                 <button type="button" @click="showModalSupplier = true"
-                    class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-colors flex items-center gap-2 shadow-sm transform hover:-translate-y-0.5">
-                    <i class="pi pi-plus"></i> Suplier Baru
+                    class="px-3 py-2 md:px-4 md:py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] md:text-xs font-bold rounded-lg transition-colors flex items-center gap-2">
+                    <i class="pi pi-users"></i> Suplier Baru
                 </button>
             </div>
         </div>
@@ -78,38 +81,22 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-8 border-b border-slate-100 pb-8">
-                <div class="flex flex-col gap-2">
-                    <label class="text-xs md:text-sm font-bold text-slate-700">Catatan <em
-                            class="font-normal text-slate-400 text-[10px]">(Opsional)</em></label>
-                    <input v-model="draf.catatan" type="text" placeholder="Contoh: Kirim segera ke gudang belakang"
-                        class="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm text-slate-800" />
-                </div>
-                <div class="flex flex-col gap-2">
-                    <label class="text-xs md:text-sm font-bold text-slate-700">Tgl. Kirim Diminta <em
-                            class="font-normal text-slate-400 text-[10px]">(Opsional)</em></label>
-                    <input v-model="draf.tanggal_kirim_diminta" type="date"
-                        class="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm text-slate-800" />
-                </div>
-            </div>
 
-            <!-- Detail Item -->
-            <div class="flex justify-between items-center mb-4 pb-2 mt-2">
+
+            <!-- Detail Item (Tombol di sini sudah dihapus) -->
+            <div class="mb-4 pb-2 mt-2">
                 <h3 class="text-sm md:text-base font-bold text-slate-800">Detail Item Pesanan</h3>
-                <div class="flex gap-2">
-                    <button type="button" @click="showModalProduct = true"
-                        class="px-3 py-2 md:px-4 md:py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 text-[10px] md:text-xs font-bold rounded-lg transition-colors flex items-center gap-2">
-                        <i class="pi pi-box"></i> Produk Baru
-                    </button>
-                    <button type="button" @click="tambahItem"
-                        class="px-3 py-2 md:px-4 md:py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 text-[10px] md:text-xs font-bold rounded-lg transition-colors flex items-center gap-2">
-                        <i class="pi pi-plus"></i> Tambah Item
-                    </button>
-                </div>
             </div>
 
             <div class="w-full mb-8">
                 <table class="w-full text-left text-sm table-fixed">
+                    <div class="flex justify-between items-center mb-4 pb-2 mt-2">
+                        <h3 class="text-sm md:text-base font-bold text-slate-800">Detail Item Pesanan</h3>
+                        <button type="button" @click="tambahItem"
+                            class="px-3 py-2 md:px-4 md:py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 text-[10px] md:text-xs font-bold rounded-lg transition-colors flex items-center gap-2">
+                            <i class="pi pi-plus"></i> Tambah Item
+                        </button>
+                    </div>
                     <thead class="hidden md:table-header-group text-slate-500 bg-slate-50/50">
                         <tr>
                             <th class="py-3 px-3 font-semibold rounded-tl-xl w-[45%]">Produk (Bahan Baku)</th>
@@ -180,7 +167,6 @@
             <div
                 class="flex flex-col md:flex-row justify-between items-start bg-slate-50 p-4 md:p-6 rounded-2xl border border-slate-100">
                 <div class="flex flex-col gap-2 w-full md:w-auto mb-6 md:mb-0">
-                    <!-- Toggle PPN -->
                     <div class="flex items-center gap-2">
                         <input type="checkbox" id="pakaiPpn" :true-value="11" :false-value="0" v-model="draf.ppn_persen"
                             class="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-600 cursor-pointer">
@@ -193,7 +179,6 @@
                     </div>
                 </div>
 
-                <!-- Ringkasan Angka -->
                 <div class="flex flex-col w-full md:w-64 gap-2 border-t md:border-none border-slate-200 pt-4 md:pt-0">
                     <div class="flex justify-between items-center text-sm">
                         <span class="font-semibold text-slate-500">Subtotal</span>
@@ -210,7 +195,7 @@
                             class="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Grand
                             Total</span>
                         <span class="text-2xl font-black text-slate-800">Rp {{ (grandTotal).toLocaleString('id-ID')
-                            }}</span>
+                        }}</span>
                     </div>
 
                     <button type="submit" :disabled="sedangProses || periodeDitutup"
@@ -222,7 +207,7 @@
             </div>
         </form>
 
-        <!-- Modals -->
+
         <SupplierForm v-if="showModalSupplier" @close="showModalSupplier = false" @saved="handleSupplierSaved" />
         <ProductEntry v-if="showModalProduct" @close="showModalProduct = false" @saved="handleProductSaved" />
     </div>

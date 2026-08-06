@@ -81,3 +81,12 @@ body {
     transition-duration: .01ms !important;
   }
 }
+
+#nprogress .bar {
+  background: #10B981 !important;
+  height: 3px !important;
+}
+
+#nprogress .peg {
+  box-shadow: 0 0 10px #10B981, 0 0 5px #10B981 !important;
+}

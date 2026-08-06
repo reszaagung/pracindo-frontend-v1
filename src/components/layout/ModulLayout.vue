@@ -35,14 +35,6 @@
                 <span></span><span></span><span></span>
             </button>
 
-            <router-view v-slot="{ Component }">
-                <transition name="fade" mode="out-in">
-                    <keep-alive :max="5">
-                        <component :is="Component" />
-                    </keep-alive>
-                </transition>
-            </router-view>
-
             <section class="mt-16 pt-8 border-t border-slate-200">
                 <WorkOrderPanel />
             </section>

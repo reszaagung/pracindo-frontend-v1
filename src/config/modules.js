@@ -126,6 +126,9 @@ export const MODUL = [
     catatan: 'Layar belum dibangun',
     menu: [],
   },
+
+  // MODUL WORK ORDER DIHAPUS DARI DASHBOARD KARENA SUDAH ADA DI PANEL BAWAH
+  /*
   {
     id: 'work_order',
     nama: 'Papan Tugas',
@@ -136,6 +139,8 @@ export const MODUL = [
     catatan: 'Endpoint backend belum ada',
     menu: [],
   },
+  */
+
   {
     id: 'dokumen',
     nama: 'Dokumen',

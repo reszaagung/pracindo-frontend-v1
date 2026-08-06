@@ -12,13 +12,25 @@
             </button>
         </header>
 
+        <!-- Indikator Loading -->
         <div v-if="isLoading && madingList.length === 0" class="flex justify-center py-12 text-slate-400">
             <i class="pi pi-spin pi-spinner text-3xl"></i>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Tampilan "Empty State" jika data kosong -->
+        <div v-else-if="!isLoading && madingList.length === 0"
+            class="flex flex-col items-center justify-center py-16 px-4 bg-slate-50/50 rounded-2xl border border-slate-200 border-dashed text-center">
+            <div
+                class="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm border border-slate-100 mb-4">
+                <i class="pi pi-inbox text-2xl text-slate-300"></i>
+            </div>
+            <h3 class="text-slate-700 font-bold mb-1">Mading Kosong</h3>
+            <p class="text-slate-500 text-sm max-w-sm">Belum ada tugas atau pesanan produksi aktif saat ini. Semua
+                pekerjaan sudah diselesaikan!</p>
+        </div>
 
-
+        <!-- Grid Card Work Order -->
+        <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div v-for="wo in madingList" :key="wo.id"
                 class="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col">
                 <div :class="[

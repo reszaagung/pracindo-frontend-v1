@@ -1,203 +1,254 @@
-<!-- 
-  features/warehouse/views/GoodsReceiptForm.vue
-  ===============================================
-  Formulir Penerimaan Barang. 
-  Telah diintegrasikan dengan InputEntryLayout untuk kontrol Sidebar dinamis.
+<!--
+   features/warehouse/views/GoodsReceiptForm.vue
+   ===============================================
+   Formulir Penerimaan Barang. 
+   Desain modern dengan responsivitas penuh (Tabel di Desktop, Card di Mobile).
 -->
 <template>
-    <div class="halaman">
-        <!-- CATATAN: <p class="remah"> (Breadcrumb) dan Judul Halaman dihapus dari sini 
-             karena sekarang otomatis di-render oleh InputEntryLayout di luar komponen ini -->
-
+    <div class="flex flex-col w-full animate-fade-in relative">
+        <!-- STATE 1: SUKSES DISIMPAN -->
         <template v-if="hasil">
-            <section class="panel panel--sukses">
-                <h1 class="judul">Penerimaan tersimpan</h1>
-                <p class="sub">{{ hasil.pesan }}</p>
-                <p class="sub">Nomor: <strong>{{ hasil.penerimaan?.nomor }}</strong></p>
-
-                <div v-if="hasil.laporan_selisih?.length" class="tabel-wrap">
-                    <table class="tabel">
-                        <thead>
-                            <tr>
-                                <th>Nomor</th>
-                                <th>Jenis</th>
-                                <th class="ka">Qty selisih</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="s in hasil.laporan_selisih" :key="s.nomor">
-                                <td class="tebal">{{ s.nomor }}</td>
-                                <td>{{ s.jenis }}</td>
-                                <td class="ka teks-merah">{{ angka(s.qty_selisih, 3) }}</td>
-                            </tr>
-                        </tbody>
-                    </table>
+            <section class="bg-white border border-emerald-200 rounded-[24px] p-6 md:p-8 shadow-sm w-full">
+                <div class="flex items-center gap-3 mb-2">
+                    <div class="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center">
+                        <i class="pi pi-check text-xl"></i>
+                    </div>
+                    <h1 class="text-xl md:text-2xl font-bold text-slate-800 tracking-tight">Penerimaan Tersimpan</h1>
+                </div>
+                <p class="text-sm text-slate-600 mb-4 ml-13">{{ hasil.pesan }}</p>
+                
+                <div class="bg-slate-50 border border-slate-100 rounded-xl p-4 mb-6 ml-0 md:ml-13">
+                    <p class="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Nomor Dokumen</p>
+                    <p class="text-lg font-black text-slate-800">{{ hasil.penerimaan?.nomor }}</p>
                 </div>
 
-                <div class="aksi">
+                <div v-if="hasil.laporan_selisih?.length" class="mb-8 ml-0 md:ml-13">
+                    <h3 class="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                        <i class="pi pi-exclamation-triangle text-amber-500"></i> Laporan Selisih Otomatis Terbit
+                    </h3>
+                    <div class="overflow-x-auto custom-scrollbar border border-slate-200 rounded-xl">
+                        <table class="w-full text-left text-sm table-auto">
+                            <thead class="bg-slate-50 text-slate-500">
+                                <tr>
+                                    <th class="py-2.5 px-4 font-semibold">Nomor Laporan</th>
+                                    <th class="py-2.5 px-4 font-semibold">Jenis</th>
+                                    <th class="py-2.5 px-4 font-semibold text-right">Qty Selisih</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                <tr v-for="s in hasil.laporan_selisih" :key="s.nomor" class="bg-white">
+                                    <td class="py-2.5 px-4 font-bold text-slate-800">{{ s.nomor }}</td>
+                                    <td class="py-2.5 px-4 text-slate-600">{{ s.jenis }}</td>
+                                    <td class="py-2.5 px-4 text-right font-bold text-rose-600">{{ angka(s.qty_selisih, 3) }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="flex flex-col sm:flex-row gap-3 ml-0 md:ml-13">
                     <router-link v-if="hasil.penerimaan?.id" :to="`/warehouse/penerimaan/${hasil.penerimaan.id}`"
-                        class="tombol tombol--utama">Lihat detail</router-link>
-                    <router-link to="/warehouse" class="tombol">Kembali ke daftar</router-link>
+                        class="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold rounded-xl transition-colors shadow-md text-center">
+                        Lihat Detail
+                    </router-link>
+                    <router-link to="/warehouse" 
+                        class="px-6 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-bold rounded-xl transition-colors text-center">
+                        Kembali ke Daftar
+                    </router-link>
                 </div>
             </section>
         </template>
 
-        <form v-else @submit.prevent="kirim">
-            <section class="panel">
-                <h2 class="panel__judul">Pilih PO</h2>
-                <select v-model.number="poIdTerpilih" class="isian" required>
-                    <option value="" disabled>Pilih purchase order...</option>
-                    <option v-for="po in daftarPOSiapTerima" :key="po.id" :value="po.id">
-                        {{ po.no_po }} — {{ po.suplier_nama }}
-                    </option>
-                </select>
-
-                <div v-if="poTerpilih" class="baris2">
-                    <label class="isian-blok">
-                        <span class="label">No. Surat Jalan</span>
-                        <input v-model="form.no_surat_jalan" type="text" required class="isian" />
-                    </label>
-                    <label class="isian-blok">
-                        <span class="label">Tanggal</span>
-                        <input v-model="form.tanggal" type="date" required class="isian" />
-                    </label>
+        <!-- STATE 2: FORMULIR INPUT -->
+        <form v-else @submit.prevent="kirim" class="space-y-6">
+            
+            <!-- Panel 1: Info PO & Surat Jalan -->
+            <section class="bg-white border border-slate-200 rounded-[24px] p-4 md:p-6 shadow-sm w-full">
+                <h2 class="text-sm font-bold text-slate-800 mb-4 pb-2 border-b border-slate-100">Referensi Dokumen</h2>
+                
+                <div class="flex flex-col gap-2 mb-4">
+                    <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">Pilih Purchase Order</label>
+                    <div class="relative">
+                        <i class="pi pi-file-edit absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                        <select v-model.number="poIdTerpilih" class="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-800 text-slate-800 appearance-none font-medium cursor-pointer" required>
+                            <option value="" disabled>-- Pilih PO Suplier --</option>
+                            <option v-for="po in daftarPOSiapTerima" :key="po.id" :value="po.id">
+                                {{ po.no_po }} &bull; {{ po.suplier_nama }}
+                            </option>
+                        </select>
+                        <i class="pi pi-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
+                    </div>
                 </div>
 
-                <label v-if="poTerpilih" class="isian-blok">
-                    <span class="label">Catatan <em>opsional</em></span>
-                    <input v-model="form.catatan" type="text" class="isian" />
-                </label>
+                <div v-if="poTerpilih" class="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
+                    <div class="flex flex-col gap-2">
+                        <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">No. Surat Jalan</label>
+                        <input v-model="form.no_surat_jalan" type="text" required placeholder="Ketik nomor surat jalan suplier..."
+                            class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-800 text-slate-800 font-medium" />
+                    </div>
+                    <div class="flex flex-col gap-2">
+                        <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">Tanggal Terima</label>
+                        <input v-model="form.tanggal" type="date" required 
+                            class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-800 text-slate-800 font-medium" />
+                    </div>
+                    <div class="flex flex-col gap-2 md:col-span-2">
+                        <label class="text-xs font-bold text-slate-500 uppercase tracking-wider">Catatan <span class="font-normal normal-case">(Opsional)</span></label>
+                        <input v-model="form.catatan" type="text" placeholder="Catatan tambahan penerimaan..."
+                            class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-800 text-slate-800" />
+                    </div>
+                </div>
             </section>
 
-            <section v-if="poTerpilih" class="panel">
-                <h2 class="panel__judul">Item</h2>
-                <div class="tabel-wrap">
-                    <table class="tabel">
-                        <thead>
+            <!-- Panel 2: Tabel Input Item -->
+            <section v-if="poTerpilih" class="bg-white border border-slate-200 rounded-[24px] p-4 md:p-6 shadow-sm w-full animate-fade-in">
+                <h2 class="text-sm font-bold text-slate-800 mb-4 pb-2 border-b border-slate-100 flex justify-between items-center">
+                    <span>Pengecekan Fisik & Timbang</span>
+                </h2>
+
+                <!-- Tampilan Desktop (Tabel) -->
+                <div class="hidden md:block overflow-x-auto custom-scrollbar">
+                    <table class="w-full text-left text-sm table-auto min-w-[65rem]">
+                        <thead class="text-slate-500 bg-slate-50/50">
                             <tr>
-                                <th>Produk</th>
-                                <th class="ka">Sisa PO</th>
-                                <th>Kemasan</th>
-                                <th class="ka">Koli</th>
-                                <th class="ka">Isi/koli</th>
-                                <th class="ka">Deklarasi</th>
-                                <th class="ka">Qty timbang</th>
-                                <th class="ka">Ditolak</th>
-                                <th class="ka">Selisih</th>
+                                <th class="py-3 px-3 font-semibold rounded-tl-xl w-[15%]">Produk</th>
+                                <th class="py-3 px-2 font-semibold text-right w-[8%]">Sisa PO</th>
+                                <th class="py-3 px-2 font-semibold w-[12%]">Kemasan</th>
+                                <th class="py-3 px-2 font-semibold text-right w-[8%]">Koli</th>
+                                <th class="py-3 px-2 font-semibold text-right w-[10%]">Isi/Koli</th>
+                                <th class="py-3 px-2 font-semibold text-right w-[10%]">Deklarasi</th>
+                                <th class="py-3 px-2 font-semibold text-right w-[12%]">Qty Timbang</th>
+                                <th class="py-3 px-2 font-semibold text-right w-[10%]">Ditolak</th>
+                                <th class="py-3 px-3 font-semibold text-right rounded-tr-xl w-[15%]">Selisih</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            <tr v-for="r in baris" :key="r.po_item_id">
-                                <td>{{ r.nama_item }}</td>
-                                <td class="ka">{{ angka(r.sisa_qty, 3) }}</td>
-                                <td>
-                                    <select v-model="r.jenis_kemasan" class="isian isian--kecil">
+                        <tbody class="divide-y divide-slate-100">
+                            <tr v-for="r in baris" :key="r.po_item_id" class="hover:bg-slate-50/30 transition-colors">
+                                <td class="py-3 px-3 font-bold text-slate-800 align-top">{{ r.nama_item }}</td>
+                                <td class="py-3 px-2 text-right text-slate-500 font-medium align-top pt-3.5">{{ angka(r.sisa_qty, 3) }}</td>
+                                <td class="py-3 px-2 align-top">
+                                    <select v-model="r.jenis_kemasan" class="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-slate-800">
                                         <option v-for="k in JENIS_KEMASAN" :key="k" :value="k">{{ k }}</option>
                                     </select>
                                 </td>
-                                <td class="ka">
-                                    <input v-if="r.jenis_kemasan !== 'CURAH'" v-model.number="r.jumlah_koli"
-                                        type="number" min="0" step="1" class="isian isian--angka" required />
-                                    <span v-else>—</span>
+                                <td class="py-3 px-2 align-top">
+                                    <input v-if="r.jenis_kemasan !== 'CURAH'" v-model.number="r.jumlah_koli" type="number" min="0" step="1" required class="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-right focus:ring-2 focus:ring-slate-800" />
                                 </td>
-                                <td class="ka">
-                                    <input v-if="r.jenis_kemasan !== 'CURAH'" v-model.number="r.isi_per_koli"
-                                        type="number" min="0" step="0.001" class="isian isian--angka" required />
-                                    <span v-else>—</span>
+                                <td class="py-3 px-2 align-top">
+                                    <input v-if="r.jenis_kemasan !== 'CURAH'" v-model.number="r.isi_per_koli" type="number" min="0" step="0.001" required class="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-right focus:ring-2 focus:ring-slate-800" />
                                 </td>
-                                <td class="ka">{{ deklarasi(r) != null ? angka(deklarasi(r), 3) : '—' }}</td>
-                                <td class="ka">
-                                    <!-- Qty diterima dibatasi ke sisa_qty -->
-                                    <input v-model.number="r.qty_diterima" type="number" min="0" step="0.001"
-                                        :max="r.sisa_qty" class="isian isian--angka" />
+                                <td class="py-3 px-2 text-right text-slate-600 font-medium align-top pt-3.5">{{ deklarasi(r) != null ? angka(deklarasi(r), 3) : '-' }}</td>
+                                <td class="py-3 px-2 align-top">
+                                    <input v-model.number="r.qty_diterima" type="number" min="0" step="0.001" :max="r.sisa_qty" class="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-right font-bold focus:ring-2 focus:ring-emerald-500" />
                                 </td>
-                                <td class="ka">
-                                    <input v-model.number="r.qty_ditolak" type="number" min="0" step="0.001"
-                                        class="isian isian--angka" />
+                                <td class="py-3 px-2 align-top">
+                                    <input v-model.number="r.qty_ditolak" type="number" min="0" step="0.001" class="w-full px-2 py-1.5 bg-slate-50 border border-rose-200 rounded-lg text-xs text-right font-bold text-rose-600 focus:ring-2 focus:ring-rose-500" />
                                 </td>
-                                <td class="ka" :class="{ 'teks-merah': melebihiToleransi(r) }">
+                                <td class="py-3 px-3 text-right font-bold align-top pt-3.5" :class="{ 'text-rose-600': melebihiToleransi(r) }">
                                     <template v-if="selisih(r) != null">
-                                        {{ angka(selisih(r), 3) }} ({{ angka(persenSelisih(r), 2) }}%)
+                                        {{ angka(selisih(r), 3) }} <span class="text-[10px] font-normal block">({{ angka(persenSelisih(r), 2) }}%)</span>
                                     </template>
-                                    <span v-else>—</span>
+                                    <span v-else class="text-slate-400 font-normal">-</span>
                                 </td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
 
-                <!-- Tampilan Card untuk HP -->
-                <div class="kartu-item-list">
-                    <div v-for="r in baris" :key="'kartu-' + r.po_item_id" class="kartu-item">
-                        <div class="kartu-item__judul">
-                            <span class="tebal">{{ r.nama_item }}</span>
-                            <span class="redup">Sisa PO: {{ angka(r.sisa_qty, 3) }}</span>
+                <!-- Tampilan Mobile (Card) -->
+                <div class="md:hidden flex flex-col gap-4">
+                    <div v-for="r in baris" :key="'kartu-' + r.po_item_id" class="border border-slate-200 rounded-xl p-4 bg-slate-50/30">
+                        <div class="flex justify-between items-center mb-4 border-b border-slate-100 pb-2">
+                            <span class="font-bold text-slate-800">{{ r.nama_item }}</span>
+                            <span class="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded">Sisa: {{ angka(r.sisa_qty, 3) }}</span>
                         </div>
-                        <label class="isian-blok">
-                            <span class="label">Kemasan</span>
-                            <select v-model="r.jenis_kemasan" class="isian">
-                                <option v-for="k in JENIS_KEMASAN" :key="k" :value="k">{{ k }}</option>
-                            </select>
-                        </label>
-                        <div v-if="r.jenis_kemasan !== 'CURAH'" class="baris2">
-                            <label class="isian-blok">
-                                <span class="label">Jumlah koli</span>
-                                <input v-model.number="r.jumlah_koli" type="number" min="0" step="1"
-                                    class="isian isian--angka" required />
-                            </label>
-                            <label class="isian-blok">
-                                <span class="label">Isi/koli</span>
-                                <input v-model.number="r.isi_per_koli" type="number" min="0" step="0.001"
-                                    class="isian isian--angka" required />
-                            </label>
+                        
+                        <div class="flex flex-col gap-3">
+                            <div class="flex flex-col gap-1.5">
+                                <label class="text-[10px] font-bold text-slate-500 uppercase">Jenis Kemasan</label>
+                                <select v-model="r.jenis_kemasan" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-slate-800">
+                                    <option v-for="k in JENIS_KEMASAN" :key="k" :value="k">{{ k }}</option>
+                                </select>
+                            </div>
+                            
+                            <div v-if="r.jenis_kemasan !== 'CURAH'" class="grid grid-cols-2 gap-3">
+                                <div class="flex flex-col gap-1.5">
+                                    <label class="text-[10px] font-bold text-slate-500 uppercase">Jml Koli</label>
+                                    <input v-model.number="r.jumlah_koli" type="number" min="0" step="1" required class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-right focus:ring-2 focus:ring-slate-800" />
+                                </div>
+                                <div class="flex flex-col gap-1.5">
+                                    <label class="text-[10px] font-bold text-slate-500 uppercase">Isi/Koli</label>
+                                    <input v-model.number="r.isi_per_koli" type="number" min="0" step="0.001" required class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-right focus:ring-2 focus:ring-slate-800" />
+                                </div>
+                            </div>
+                            
+                            <div class="flex justify-between items-center bg-slate-100 p-2 rounded-lg">
+                                <span class="text-[10px] font-bold text-slate-500 uppercase">Total Deklarasi:</span>
+                                <span class="font-bold text-slate-700">{{ deklarasi(r) != null ? angka(deklarasi(r), 3) : '-' }}</span>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-3 mt-2">
+                                <div class="flex flex-col gap-1.5">
+                                    <label class="text-[10px] font-bold text-emerald-600 uppercase">Qty Timbang</label>
+                                    <input v-model.number="r.qty_diterima" type="number" min="0" step="0.001" :max="r.sisa_qty" class="w-full px-3 py-2 bg-white border border-emerald-200 rounded-lg text-sm text-right font-bold focus:ring-2 focus:ring-emerald-500" />
+                                </div>
+                                <div class="flex flex-col gap-1.5">
+                                    <label class="text-[10px] font-bold text-rose-500 uppercase">Qty Ditolak</label>
+                                    <input v-model.number="r.qty_ditolak" type="number" min="0" step="0.001" class="w-full px-3 py-2 bg-white border border-rose-200 rounded-lg text-sm text-right font-bold text-rose-600 focus:ring-2 focus:ring-rose-500" />
+                                </div>
+                            </div>
+
+                            <div v-if="selisih(r) != null" class="flex justify-between items-center p-2 rounded-lg mt-1 border" :class="melebihiToleransi(r) ? 'bg-rose-50 border-rose-100' : 'bg-slate-50 border-slate-100'">
+                                <span class="text-[10px] font-bold uppercase" :class="melebihiToleransi(r) ? 'text-rose-600' : 'text-slate-500'">Selisih:</span>
+                                <span class="font-bold" :class="melebihiToleransi(r) ? 'text-rose-600' : 'text-slate-700'">
+                                    {{ angka(selisih(r), 3) }} ({{ angka(persenSelisih(r), 2) }}%)
+                                </span>
+                            </div>
                         </div>
-                        <p class="kartu-item__deklarasi">
-                            Deklarasi: {{ deklarasi(r) != null ? angka(deklarasi(r), 3) : '—' }}
-                        </p>
-                        <div class="baris2">
-                            <label class="isian-blok">
-                                <span class="label">Qty timbang</span>
-                                <input v-model.number="r.qty_diterima" type="number" min="0" step="0.001"
-                                    :max="r.sisa_qty" class="isian isian--angka" />
-                            </label>
-                            <label class="isian-blok">
-                                <span class="label">Ditolak</span>
-                                <input v-model.number="r.qty_ditolak" type="number" min="0" step="0.001"
-                                    class="isian isian--angka" />
-                            </label>
-                        </div>
-                        <p class="kartu-item__selisih" :class="{ 'teks-merah': melebihiToleransi(r) }">
-                            <template v-if="selisih(r) != null">
-                                Selisih: {{ angka(selisih(r), 3) }} ({{ angka(persenSelisih(r), 2) }}%)
-                            </template>
-                        </p>
                     </div>
                 </div>
 
-                <p v-for="r in barisMelebihiToleransi" :key="r.po_item_id" class="peringatan">
-                    {{ r.nama_item }}: selisih melebihi 0,5% — laporan selisih akan terbit otomatis.
-                </p>
+                <!-- Notifikasi Dinamis dalam Form -->
+                <div class="mt-6 space-y-3">
+                    <div v-for="r in barisMelebihiToleransi" :key="r.po_item_id" class="p-3 bg-amber-50 border border-amber-200 rounded-xl flex gap-3 items-start">
+                        <i class="pi pi-exclamation-triangle text-amber-500 mt-0.5"></i>
+                        <div class="text-xs text-amber-700">
+                            <strong>{{ r.nama_item }}:</strong> Selisih melebihi 0.5%. Laporan selisih akan diterbitkan secara otomatis setelah disimpan.
+                        </div>
+                    </div>
 
-                <div v-for="r in baris.filter(r => Number(r.qty_ditolak) > 0)" :key="'tolak-' + r.po_item_id"
-                    class="isian-blok">
-                    <span class="label">Alasan tolak — {{ r.nama_item }}</span>
-                    <input v-model="r.alasan_tolak" type="text" required class="isian" />
+                    <div v-for="r in baris.filter(r => Number(r.qty_ditolak) > 0)" :key="'tolak-' + r.po_item_id" class="flex flex-col gap-2 mt-4 p-4 border border-rose-100 bg-rose-50/30 rounded-xl">
+                        <label class="text-xs font-bold text-rose-600 uppercase tracking-wider">Alasan Tolak - {{ r.nama_item }}</label>
+                        <input v-model="r.alasan_tolak" type="text" required placeholder="Jelaskan alasan penolakan..."
+                            class="w-full px-4 py-2.5 bg-white border border-rose-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rose-400 text-slate-800" />
+                    </div>
+
+                    <div v-for="r in barisLewatSisa" :key="'lewat-' + r.po_item_id" class="p-3 bg-red-50 border border-red-200 rounded-xl flex gap-3 items-start">
+                        <i class="pi pi-times-circle text-red-500 mt-0.5"></i>
+                        <div class="text-xs text-red-700">
+                            <strong>{{ r.nama_item }}:</strong> Qty timbang melebihi sisa PO yang diizinkan (Maks: {{ angka(r.sisa_qty, 3) }}).
+                        </div>
+                    </div>
                 </div>
 
-                <p v-for="r in barisLewatSisa" :key="'lewat-' + r.po_item_id" class="peringatan">
-                    {{ r.nama_item }}: qty timbang melebihi sisa PO ({{ angka(r.sisa_qty, 3) }}).
-                </p>
+                <!-- Area Error Global & Tombol Submit -->
+                <div class="mt-8 pt-6 border-t border-slate-100">
+                    <div v-if="pesanError" class="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600 font-bold flex items-center gap-2">
+                        <i class="pi pi-exclamation-circle"></i> {{ pesanError }}
+                    </div>
+
+                    <div class="flex justify-end gap-3">
+                        <router-link to="/warehouse" class="px-6 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-bold rounded-xl transition-colors">
+                            Batal
+                        </router-link>
+                        <button type="submit" :disabled="sedangProses || barisLewatSisa.length > 0"
+                            class="px-8 py-3 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300 text-white text-sm font-bold rounded-xl shadow-md transition-all flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed transform hover:-translate-y-0.5">
+                            <i v-if="sedangProses" class="pi pi-spin pi-spinner text-xs"></i>
+                            <i v-else class="pi pi-save text-xs"></i>
+                            {{ sedangProses ? 'Menyimpan...' : 'Simpan Penerimaan' }}
+                        </button>
+                    </div>
+                </div>
             </section>
-
-            <p v-if="pesanError" class="galat">{{ pesanError }}</p>
-
-            <div v-if="poTerpilih" class="aksi">
-                <router-link to="/warehouse" class="tombol">Batal</router-link>
-                <button type="submit" class="tombol tombol--utama"
-                    :disabled="sedangProses || barisLewatSisa.length > 0">
-                    {{ sedangProses ? 'Menyimpan...' : 'Simpan Penerimaan' }}
-                </button>
-            </div>
         </form>
     </div>
 </template>
@@ -210,23 +261,23 @@ import { angka, hariIni } from '@/utils/format'
 
 const JENIS_KEMASAN = ['KARUNG', 'DRUM', 'JERIGEN', 'DUS', 'SAK', 'CURAH']
 
-const { daftarPOSiapTerima, sedangProses, muatPOSiapTerima, simpanPenerimaan } = useGoodsReceipt()
+const { daftarPOSiapTerima, sedangProses, muatPOSiapTerima, simpanPenerimaan } = useGoodsReceipt()[cite: 6]
 
 // Ekstrak state dari layout
-const { setNavInfo, resetNav } = useNavInputEntry()
+const { setNavInfo, resetNav } = useNavInputEntry()[cite: 6]
 
-const poIdTerpilih = ref('')
-const poTerpilih = computed(() => daftarPOSiapTerima.value.find(po => po.id === poIdTerpilih.value) ?? null)
+const poIdTerpilih = ref('')[cite: 6]
+const poTerpilih = computed(() => daftarPOSiapTerima.value.find(po => po.id === poIdTerpilih.value) ?? null)[cite: 6]
 
 const form = reactive({
     no_surat_jalan: '',
     tanggal: hariIni(),
     catatan: ''
-})
+})[cite: 6]
 
-const baris = ref([])
-const pesanError = ref('')
-const hasil = ref(null)
+const baris = ref([])[cite: 6]
+const pesanError = ref('')[cite: 6]
+const hasil = ref(null)[cite: 6]
 
 watch(poTerpilih, (po) => {
     baris.value = (po?.item ?? []).map(it => ({
@@ -239,38 +290,37 @@ watch(poTerpilih, (po) => {
         qty_diterima: null,
         qty_ditolak: 0,
         alasan_tolak: '',
-    }))
+    }))[cite: 6]
 })
 
 const deklarasi = (r) => {
-    if (r.jenis_kemasan === 'CURAH' || !r.jumlah_koli || !r.isi_per_koli) return null
-    return r.jumlah_koli * r.isi_per_koli
+    if (r.jenis_kemasan === 'CURAH' || !r.jumlah_koli || !r.isi_per_koli) return null[cite: 6]
+    return r.jumlah_koli * r.isi_per_koli[cite: 6]
 }
 
 const selisih = (r) => {
-    const d = deklarasi(r)
-    if (d == null || r.qty_diterima == null || r.qty_diterima === '') return null
-    return Number(r.qty_diterima) - d
+    const d = deklarasi(r)[cite: 6]
+    if (d == null || r.qty_diterima == null || r.qty_diterima === '') return null[cite: 6]
+    return Number(r.qty_diterima) - d[cite: 6]
 }
 
 const persenSelisih = (r) => {
-    const d = deklarasi(r)
-    const s = selisih(r)
-    return d && s != null ? (s / d) * 100 : null
+    const d = deklarasi(r)[cite: 6]
+    const s = selisih(r)[cite: 6]
+    return d && s != null ? (s / d) * 100 : null[cite: 6]
 }
 
 const melebihiToleransi = (r) => {
-    const p = persenSelisih(r)
-    return p != null && Math.abs(p) > 0.5
+    const p = persenSelisih(r)[cite: 6]
+    return p != null && Math.abs(p) > 0.5[cite: 6]
 }
 
-const barisMelebihiToleransi = computed(() => baris.value.filter(melebihiToleransi))
-
+const barisMelebihiToleransi = computed(() => baris.value.filter(melebihiToleransi))[cite: 6]
 const barisLewatSisa = computed(() =>
-    baris.value.filter(r => r.qty_diterima != null && Number(r.qty_diterima) > r.sisa_qty))
+    baris.value.filter(r => r.qty_diterima != null && Number(r.qty_diterima) > r.sisa_qty))[cite: 6]
 
 const kirim = async () => {
-    pesanError.value = ''
+    pesanError.value = ''[cite: 6]
 
     const barisKirim = baris.value
         .filter(r => Number(r.qty_diterima) > 0)
@@ -282,10 +332,10 @@ const kirim = async () => {
             qty_diterima: String(r.qty_diterima),
             qty_ditolak: String(r.qty_ditolak || 0),
             alasan_tolak: r.alasan_tolak || '',
-        }))
+        }))[cite: 6]
 
     if (!barisKirim.length) {
-        pesanError.value = 'Minimal satu item harus diisi qty timbang.'
+        pesanError.value = 'Minimal satu item harus diisi qty timbang.'[cite: 6]
         return
     }
 
@@ -296,259 +346,53 @@ const kirim = async () => {
         dokumen_id: null,
         catatan: form.catatan,
         baris: barisKirim,
-    })
+    })[cite: 6]
 
     if (res.success) {
-        hasil.value = res.data
+        hasil.value = res.data[cite: 6]
     } else {
-        pesanError.value = res.message
+        pesanError.value = res.message[cite: 6]
     }
 }
 
 onMounted(() => {
-    setNavInfo('Penerimaan Barang Baru', 'Warehouse > Penerimaan > Entry')
-    muatPOSiapTerima()
+    setNavInfo('Penerimaan Barang Baru', 'Warehouse > Penerimaan > Entry')[cite: 6]
+    muatPOSiapTerima()[cite: 6]
 })
 
 onUnmounted(() => {
-    resetNav()
+    resetNav()[cite: 6]
 })
 </script>
 
 <style scoped>
-.halaman {
-    width: 100%;
+.animate-fade-in {
+    animation: fadeIn 0.3s ease-out forwards;
 }
 
-.judul {
-    margin: 0;
-    font-size: 1.375rem;
-    font-weight: 700;
-    color: var(--teks);
-}
-
-.sub {
-    margin: .4rem 0 0;
-    font-size: .875rem;
-    color: var(--redup);
-}
-
-.panel {
-    background: var(--panel);
-    border: 1px solid var(--garis);
-    border-radius: var(--lengkung);
-    padding: 1.25rem;
-    margin-bottom: 1.25rem;
-}
-
-.panel--sukses {
-    border-color: var(--hijau);
-}
-
-.panel__judul {
-    margin: 0 0 1rem;
-    font-size: .9375rem;
-    font-weight: 700;
-    color: var(--teks);
-}
-
-.label {
-    display: block;
-    margin-bottom: .4rem;
-    font-size: .6875rem;
-    font-weight: 700;
-    letter-spacing: .06em;
-    text-transform: uppercase;
-    color: var(--redup-2);
-}
-
-.label em {
-    text-transform: none;
-    font-weight: 400;
-    letter-spacing: 0;
-}
-
-.isian {
-    width: 100%;
-    font-family: inherit;
-    font-size: .875rem;
-    color: var(--teks);
-    background: var(--panel);
-    border: 1px solid var(--garis-tegas);
-    border-radius: var(--lengkung-kecil);
-    padding: .6rem .7rem;
-}
-
-.isian:focus {
-    outline: none;
-    border-color: var(--biru);
-}
-
-.isian--kecil {
-    padding: .4rem .5rem;
-    font-size: .8125rem;
-}
-
-.isian--angka {
-    text-align: right;
-    min-width: 6rem;
-}
-
-.isian-blok {
-    margin-top: 1rem;
-}
-
-.baris2 {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-    margin-top: 1rem;
-}
-
-@media (max-width: 560px) {
-    .baris2 {
-        grid-template-columns: 1fr;
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
     }
 }
 
-.tabel-wrap {
-    overflow-x: auto;
+.custom-scrollbar::-webkit-scrollbar {
+    height: 6px;
+    width: 6px;
 }
-
-.tabel {
-    width: 100%;
-    border-collapse: collapse;
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
 }
-
-.kartu-item-list {
-    display: none;
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
 }
-
-.tabel th {
-    text-align: left;
-    font-size: .6875rem;
-    font-weight: 700;
-    letter-spacing: .06em;
-    text-transform: uppercase;
-    color: var(--redup-2);
-    padding: .6rem .5rem;
-    border-bottom: 1px solid var(--garis);
-    white-space: nowrap;
-}
-
-.tabel td {
-    padding: .5rem;
-    font-size: .8125rem;
-    color: var(--teks-2);
-    border-bottom: 1px solid var(--garis);
-    vertical-align: middle;
-}
-
-.ka {
-    text-align: right;
-}
-
-.tebal {
-    font-weight: 600;
-    color: var(--teks);
-}
-
-.teks-merah {
-    color: var(--merah);
-    font-weight: 600;
-}
-
-.peringatan {
-    margin: .75rem 0 0;
-    padding: .6rem .8rem;
-    background: var(--merah-latar);
-    color: var(--merah);
-    border-radius: var(--lengkung-kecil);
-    font-size: .8125rem;
-}
-
-.galat {
-    padding: .75rem 1rem;
-    background: var(--merah-latar);
-    color: var(--merah);
-    border-radius: var(--lengkung-kecil);
-    font-size: .8125rem;
-    margin-bottom: 1rem;
-}
-
-.aksi {
-    display: flex;
-    gap: .6rem;
-    justify-content: flex-end;
-}
-
-.tombol {
-    font-family: inherit;
-    font-size: .8125rem;
-    font-weight: 600;
-    color: var(--teks);
-    background: var(--panel);
-    border: 1px solid var(--garis-tegas);
-    border-radius: var(--lengkung-kecil);
-    padding: .65rem 1.25rem;
-    cursor: pointer;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-}
-
-.tombol--utama {
-    background: var(--biru);
-    border-color: var(--biru);
-    color: #fff;
-}
-
-@media (max-width: 768px) {
-    .tabel-wrap {
-        display: none;
-    }
-
-    .kartu-item-list {
-        display: flex;
-        flex-direction: column;
-        gap: .85rem;
-    }
-
-    .kartu-item {
-        border: 1px solid var(--garis);
-        border-radius: var(--lengkung-kecil);
-        padding: .9rem;
-    }
-
-    .kartu-item__judul {
-        display: flex;
-        justify-content: space-between;
-        align-items: baseline;
-        margin-bottom: .75rem;
-    }
-
-    .redup {
-        font-size: .75rem;
-        color: var(--redup);
-    }
-
-    .kartu-item__deklarasi {
-        margin: .5rem 0 0;
-        font-size: .8125rem;
-        color: var(--redup);
-    }
-
-    .kartu-item__selisih {
-        margin: .75rem 0 0;
-        font-size: .8125rem;
-        font-weight: 600;
-        color: var(--teks);
-        min-height: 1.2em;
-    }
-}
-
-.tombol:disabled {
-    opacity: .5;
-    cursor: not-allowed;
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
 }
 </style>

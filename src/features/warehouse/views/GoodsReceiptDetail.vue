@@ -1,93 +1,124 @@
 <!--
   features/warehouse/views/GoodsReceiptDetail.vue
   =================================================
-  Satu panggilan ke penerimaan/{id}/ringkasan/ berisi ringkasan item DAN
-  laporan selisih sekaligus — tidak perlu request kedua.
-
-  CATATAN: respons ringkasan/ menyertakan field `klaim` (nilai_klaim) di
-  tiap baris selisih TANPA gerbang ?sisi= atau cek peran akunting — beda
-  dari serializer lain di modul ini yang konsisten menyembunyikan uang
-  dari gudang. Field itu SENGAJA tidak dirender di sini; ini celah
-  backend yang sebaiknya ditutup di sana, bukan ditambal di sini.
+  Detail penerimaan barang & laporan selisih otomatis dengan Tailwind CSS modern.
 -->
 <template>
-    <div class="halaman">
-        <p v-if="galat" class="galat">{{ galat }}</p>
+    <div class="flex flex-col w-full animate-fade-in relative">
+        <!-- Notifikasi Error -->
+        <div v-if="galat"
+            class="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600 font-medium flex items-start gap-3 shadow-sm">
+            <i class="pi pi-exclamation-triangle mt-0.5"></i>
+            <span>{{ galat }}</span>
+        </div>
 
         <template v-if="ringkasan">
-            <header class="kepala">
+            <!-- Header -->
+            <div class="mb-6 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
                 <div>
-                    <p class="remah">
-                        <router-link to="/warehouse">Penerimaan Barang</router-link> › {{ ringkasan.nomor }}
+                    <p class="text-xs text-slate-400 mb-1">
+                        <router-link to="/warehouse" class="hover:text-slate-700 transition-colors">Penerimaan
+                            Barang</router-link>
+                        <span class="mx-1">/</span>
+                        <span class="text-slate-600 font-semibold">{{ ringkasan.nomor }}</span>
                     </p>
-                    <h1 class="judul">{{ ringkasan.nomor }}</h1>
-                    <p class="sub">
-                        {{ ringkasan.suplier }} · PO {{ ringkasan.po }} · {{ tanggal(ringkasan.tanggal) }}
+                    <h2 class="text-xl md:text-2xl font-bold text-slate-800 tracking-tight">{{ ringkasan.nomor }}</h2>
+                    <p class="text-xs md:text-sm text-slate-500 mt-1">
+                        {{ ringkasan.suplier }} &bull; PO {{ ringkasan.po }} &bull; {{ tanggal(ringkasan.tanggal)
+                        }}[cite: 6]
                     </p>
                 </div>
-                <span v-if="ringkasan.ada_selisih" class="lencana lencana--merah">Ada selisih</span>
-            </header>
+                <span v-if="ringkasan.ada_selisih"
+                    class="bg-red-50 text-red-600 border border-red-200 px-3 py-1 rounded-full text-xs font-bold tracking-wide uppercase inline-flex items-center gap-1.5 shadow-sm">
+                    <i class="pi pi-exclamation-circle"></i> Ada Selisih
+                </span>
+            </div>
 
-            <section class="panel">
-                <h2 class="panel__judul">Item diterima</h2>
-                <div class="tabel-wrap">
-                    <table class="tabel">
-                        <thead>
+            <!-- Panel 1: Item Diterima -->
+            <div class="bg-white border border-slate-200 rounded-[24px] p-4 md:p-6 shadow-sm w-full mb-6">
+                <h3
+                    class="text-sm font-bold text-slate-800 mb-4 pb-3 border-b border-slate-100 flex items-center gap-2">
+                    <i class="pi pi-box text-emerald-600"></i> Item Diterima
+                </h3>
+
+                <div class="overflow-x-auto custom-scrollbar">
+                    <table class="w-full text-left text-sm table-auto min-w-[50rem]">
+                        <thead class="text-slate-500 bg-slate-50/50">
                             <tr>
-                                <th>Nama</th>
-                                <th>Kemasan</th>
-                                <th class="ka">Koli</th>
-                                <th class="ka">Isi/koli</th>
-                                <th class="ka">Deklarasi</th>
-                                <th class="ka">Timbang</th>
-                                <th class="ka">Ditolak</th>
-                                <th class="ka">Selisih</th>
+                                <th class="py-3 px-3 font-semibold rounded-l-xl">Nama Produk</th>
+                                <th class="py-3 px-3 font-semibold">Kemasan</th>
+                                <th class="py-3 px-3 font-semibold text-right">Koli</th>
+                                <th class="py-3 px-3 font-semibold text-right">Isi/Koli</th>
+                                <th class="py-3 px-3 font-semibold text-right">Deklarasi</th>
+                                <th class="py-3 px-3 font-semibold text-right">Timbang</th>
+                                <th class="py-3 px-3 font-semibold text-right">Ditolak</th>
+                                <th class="py-3 px-3 font-semibold text-right rounded-r-xl">Selisih</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            <tr v-for="(it, i) in ringkasan.item" :key="i">
-                                <td>{{ it.nama }}</td>
-                                <td>{{ it.kemasan }}</td>
-                                <td class="ka">{{ it.koli ?? '—' }}</td>
-                                <td class="ka">{{ it.isi_per_koli ? angka(it.isi_per_koli, 3) : '—' }}</td>
-                                <td class="ka">{{ it.deklarasi ? angka(it.deklarasi, 3) : '—' }}</td>
-                                <td class="ka">{{ angka(it.timbang, 3) }}</td>
-                                <td class="ka">{{ angka(it.ditolak, 3) }}</td>
-                                <td class="ka" :class="{ 'teks-merah': melebihiToleransi(it.persen) }">
-                                    {{ it.selisih_berat != null ? angka(it.selisih_berat, 3) : '—' }}
-                                    <span v-if="it.persen != null">({{ angka(it.persen, 2) }}%)</span>
+                        <tbody class="divide-y divide-slate-100">
+                            <tr v-for="(it, i) in ringkasan.item" :key="i"
+                                class="hover:bg-slate-50/50 transition-colors">
+                                <td class="py-3.5 px-3 font-bold text-slate-800">{{ it.nama }}</td>
+                                <td class="py-3.5 px-3 text-slate-600">{{ it.kemasan }}</td>
+                                <td class="py-3.5 px-3 text-right text-slate-600">{{ it.koli ?? '-' }}</td>
+                                <td class="py-3.5 px-3 text-right text-slate-600">{{ it.isi_per_koli ?
+                                    angka(it.isi_per_koli, 3) : '-' }}</td>
+                                <td class="py-3.5 px-3 text-right text-slate-600">{{ it.deklarasi ? angka(it.deklarasi,
+                                    3) : '-' }}</td>
+                                <td class="py-3.5 px-3 text-right font-medium text-slate-800">{{ angka(it.timbang, 3) }}
+                                </td>
+                                <td class="py-3.5 px-3 text-right text-rose-600 font-medium">{{ angka(it.ditolak, 3) }}
+                                </td>
+                                <td class="py-3.5 px-3 text-right font-bold"
+                                    :class="{ 'text-rose-600': melebihiToleransi(it.persen) }">
+                                    {{ it.selisih_berat != null ? angka(it.selisih_berat, 3) : '-' }}
+                                    <span v-if="it.persen != null" class="text-xs font-normal block md:inline">({{
+                                        angka(it.persen, 2) }}%)</span>
                                 </td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
-            </section>
+            </div>
 
-            <section v-if="ringkasan.selisih?.length" class="panel">
-                <h2 class="panel__judul">Laporan selisih otomatis</h2>
-                <div class="tabel-wrap">
-                    <table class="tabel">
-                        <thead>
+            <!-- Panel 2: Laporan Selisih Otomatis -->
+            <div v-if="ringkasan.selisih?.length"
+                class="bg-white border border-slate-200 rounded-[24px] p-4 md:p-6 shadow-sm w-full">
+                <h3
+                    class="text-sm font-bold text-slate-800 mb-4 pb-3 border-b border-slate-100 flex items-center gap-2">
+                    <i class="pi pi-exclamation-triangle text-amber-600"></i> Laporan Selisih Otomatis
+                </h3>
+
+                <div class="overflow-x-auto custom-scrollbar">
+                    <table class="w-full text-left text-sm table-auto min-w-[35rem]">
+                        <thead class="text-slate-500 bg-slate-50/50">
                             <tr>
-                                <th>Nomor</th>
-                                <th>Jenis</th>
-                                <th class="ka">Qty</th>
-                                <th>Status</th>
-                                <th>Resolusi</th>
+                                <th class="py-3 px-3 font-semibold rounded-l-xl">Nomor</th>
+                                <th class="py-3 px-3 font-semibold">Jenis</th>
+                                <th class="py-3 px-3 font-semibold text-right">Qty</th>
+                                <th class="py-3 px-3 font-semibold text-center">Status</th>
+                                <th class="py-3 px-3 font-semibold rounded-r-xl">Resolusi</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            <tr v-for="s in ringkasan.selisih" :key="s.nomor">
-                                <td class="tebal">{{ s.nomor }}</td>
-                                <td>{{ s.jenis }}</td>
-                                <td class="ka teks-merah">{{ angka(s.qty, 3) }}</td>
-                                <td>{{ s.status }}</td>
-                                <td>{{ s.resolusi ?? '—' }}</td>
+                        <tbody class="divide-y divide-slate-100">
+                            <tr v-for="s in ringkasan.selisih" :key="s.nomor"
+                                class="hover:bg-slate-50/50 transition-colors">
+                                <td class="py-3.5 px-3 font-bold text-slate-800">{{ s.nomor }}[cite: 6]</td>
+                                <td class="py-3.5 px-3 text-slate-600">{{ s.jenis }}[cite: 6]</td>
+                                <td class="py-3.5 px-3 text-right font-bold text-rose-600">{{ angka(s.qty, 3) }}[cite:
+                                    6]</td>
+                                <td class="py-3.5 px-3 text-center">
+                                    <span
+                                        class="px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wide uppercase border bg-amber-50 text-amber-600 border-amber-200">
+                                        {{ s.status }}[cite: 6]
+                                    </span>
+                                </td>
+                                <td class="py-3.5 px-3 text-slate-600 font-medium">{{ s.resolusi ?? '-' }}[cite: 6]</td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
-            </section>
+            </div>
         </template>
     </div>
 </template>
@@ -97,134 +128,48 @@ import { onMounted } from 'vue'
 import { useGoodsReceipt } from '../composables/useGoodsReceipt'
 import { angka, tanggal } from '@/utils/format'
 
-const props = defineProps({ id: { type: [String, Number], required: true } })
+const props = defineProps({
+    id: { type: [String, Number], required: true }
+})
 
 const { ringkasan, galat, muatRingkasan } = useGoodsReceipt()
 
-const melebihiToleransi = (persen) => persen != null && Math.abs(persen) > 0.5
+const melebihiToleransi = (persen) => persen != null && Math.abs(persen) > 0.5[cite: 6]
 
-onMounted(() => muatRingkasan(props.id))
+onMounted(() => muatRingkasan(props.id))[cite: 6]
 </script>
 
 <style scoped>
-.halaman {
-    max-width: 72rem;
-    margin: 0 auto;
+.animate-fade-in {
+    animation: fadeIn 0.3s ease-out forwards;
 }
 
-.galat {
-    padding: .75rem 1rem;
-    background: var(--merah-latar);
-    color: var(--merah);
-    border-radius: var(--lengkung-kecil);
-    font-size: .8125rem;
-    margin-bottom: 1rem;
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
-.kepala {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 1rem;
-    flex-wrap: wrap;
-    margin-bottom: 1.5rem;
+.custom-scrollbar::-webkit-scrollbar {
+    height: 6px;
 }
 
-.remah {
-    margin: 0 0 .3rem;
-    font-size: .75rem;
-    color: var(--redup-2);
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
 }
 
-.remah a {
-    color: var(--redup);
-    text-decoration: none;
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
 }
 
-.remah a:hover {
-    color: var(--teks);
-}
-
-.judul {
-    margin: 0;
-    font-size: 1.375rem;
-    font-weight: 700;
-    color: var(--teks);
-}
-
-.sub {
-    margin: .3rem 0 0;
-    font-size: .875rem;
-    color: var(--redup);
-}
-
-.lencana {
-    font-size: .6875rem;
-    font-weight: 700;
-    padding: .25rem .6rem;
-    border-radius: 999px;
-    height: fit-content;
-}
-
-.lencana--merah {
-    color: var(--merah);
-    background: var(--merah-latar);
-}
-
-.panel {
-    background: var(--panel);
-    border: 1px solid var(--garis);
-    border-radius: var(--lengkung);
-    padding: 1.25rem;
-    margin-bottom: 1.25rem;
-}
-
-.panel__judul {
-    margin: 0 0 1rem;
-    font-size: .9375rem;
-    font-weight: 700;
-    color: var(--teks);
-}
-
-.tabel-wrap {
-    overflow-x: auto;
-}
-
-.tabel {
-    width: 100%;
-    border-collapse: collapse;
-    min-width: 40rem;
-}
-
-.tabel th {
-    text-align: left;
-    font-size: .6875rem;
-    font-weight: 700;
-    letter-spacing: .06em;
-    text-transform: uppercase;
-    color: var(--redup-2);
-    padding: .6rem .5rem;
-    border-bottom: 1px solid var(--garis);
-}
-
-.tabel td {
-    padding: .6rem .5rem;
-    font-size: .8125rem;
-    color: var(--teks-2);
-    border-bottom: 1px solid var(--garis);
-}
-
-.ka {
-    text-align: right;
-}
-
-.tebal {
-    font-weight: 600;
-    color: var(--teks);
-}
-
-.teks-merah {
-    color: var(--merah);
-    font-weight: 600;
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
 }
 </style>
