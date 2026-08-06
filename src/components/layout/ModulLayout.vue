@@ -34,7 +34,18 @@
             <button class="buka-side" @click="toggleSidebar" aria-label="Buka menu">
                 <span></span><span></span><span></span>
             </button>
-            <router-view />
+
+            <router-view v-slot="{ Component }">
+                <transition name="fade" mode="out-in">
+                    <keep-alive :max="5">
+                        <component :is="Component" />
+                    </keep-alive>
+                </transition>
+            </router-view>
+
+            <section class="mt-16 pt-8 border-t border-slate-200">
+                <WorkOrderPanel />
+            </section>
         </main>
     </div>
 </template>
@@ -46,6 +57,7 @@ import { cariModul } from '@/config/modules'
 import { useAuth } from '@/composables/useAuth'
 import { useLayout } from '@/composables/useLayout'
 import BaseIcon from '@/components/ui/BaseIcon.vue'
+import WorkOrderPanel from '@/features/work-order/views/WorkOrderBoard.vue'
 
 const route = useRoute()
 const { kartu: kartuAuth } = useAuth()
@@ -54,11 +66,25 @@ const { sidebarAktif, toggleSidebar, tutupDiMobile } = useLayout()
 const kartu = computed(() => kartuAuth.value ?? { nama: '—', role_display: '—' })
 const modul = computed(() => cariModul(route.meta?.modul))
 
-// Di layar kecil, sidebar menutup sendiri setelah pindah halaman.
 watch(() => route.fullPath, tutupDiMobile)
 </script>
 
 <style scoped>
+.fade-enter-active,
+.fade-leave-active {
+    transition: opacity 0.25s ease-out, transform 0.25s ease-out;
+}
+
+.fade-enter-from {
+    opacity: 0;
+    transform: translateY(10px);
+}
+
+.fade-leave-to {
+    opacity: 0;
+    transform: translateY(-10px);
+}
+
 .rangka {
     display: grid;
     grid-template-columns: 224px 1fr;
@@ -144,7 +170,6 @@ watch(() => route.fullPath, tutupDiMobile)
     min-width: 0;
 }
 
-/* tombol hamburger — hanya di layar kecil */
 .buka-side {
     display: none;
     flex-direction: column;

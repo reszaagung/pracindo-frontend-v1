@@ -6,7 +6,6 @@ const api = axios.create({
   headers: { Accept: 'application/json' },
 })
 
-// Endpoint yang 401-nya berarti "kredensial salah", bukan "sesi habis"
 const PUBLIK = ['auth/login/', 'auth/daftar/', 'auth/lupa-password/']
 const endpointPublik = (url = '') => PUBLIK.some((p) => url.includes(p))
 
@@ -24,14 +23,11 @@ api.interceptors.response.use(
   async (err) => {
     const { response, config } = err
 
-    // Server mati atau jaringan putus — jangan disamakan dengan sesi habis
     if (!response) return Promise.reject(err)
 
     if (response.status === 401 && !endpointPublik(config?.url)) {
       const { keluar } = useAuth()
       keluar()
-
-      // Impor dinamis untuk mencegah dependensi melingkar (api <-> router)
       const { default: router } = await import('@/router')
       const kini = router.currentRoute.value
 
@@ -43,7 +39,6 @@ api.interceptors.response.use(
       }
     }
 
-    // 403 sengaja dilepas agar ditangkap langsung oleh blok try-catch di komponen
     return Promise.reject(err)
   }
 )

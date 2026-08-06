@@ -1,7 +1,4 @@
 // src/features/warehouse/composables/useGoodsReceipt.js
-// Kontrak diverifikasi langsung dari warehouse/views.py & serializers.py
-// (pracindo_backend_v1) — lihat SPEK-BACKEND.md §3.3.
-
 import { ref } from 'vue'
 import api from '@/utils/api'
 import { bacaError } from '@/utils/error'
@@ -52,13 +49,13 @@ export function useGoodsReceipt() {
         }
     }
 
-    /** @returns {Promise<{success:true,data:{penerimaan,laporan_selisih,pesan}}|{success:false,message:string}>} */
     const simpanPenerimaan = async (payload) => {
         sedangProses.value = true
         galat.value = ''
         try {
-            const { data } = await api.post('warehouse/penerimaan/', payload)
-            return { success: true, data }
+            const { data } = await api.get('warehouse/penerimaan/', payload)
+            const response = await api.post('warehouse/penerimaan/', payload)
+            return { success: true, data: response.data }
         } catch (err) {
             galat.value = bacaError(err, 'Gagal menyimpan penerimaan.')
             return { success: false, message: galat.value }

@@ -1,19 +1,13 @@
-<!--
+<!-- 
   features/warehouse/views/GoodsReceiptForm.vue
   ===============================================
-  Layar penerimaan barang. Tiga angka per item — PO, deklarasi, timbang —
-  dihitung ulang saat mengetik, tanpa tombol hitung. Selisih di atas 0,5%
-  ditandai merah karena backend otomatis menerbitkan laporan selisih.
-
-  qty_diterima dibatasi ke sisa_qty (sisa PO), BUKAN qty_pesan — PO boleh
-  diterima bertahap. dokumen_id selalu null: endpoint upload dokumen belum
-  ada (SPEK-BACKEND.md §3.3).
+  Formulir Penerimaan Barang. 
+  Telah diintegrasikan dengan InputEntryLayout untuk kontrol Sidebar dinamis.
 -->
 <template>
     <div class="halaman">
-        <p class="remah">
-            <router-link to="/warehouse">Penerimaan Barang</router-link> › Penerimaan Baru
-        </p>
+        <!-- CATATAN: <p class="remah"> (Breadcrumb) dan Judul Halaman dihapus dari sini 
+             karena sekarang otomatis di-render oleh InputEntryLayout di luar komponen ini -->
 
         <template v-if="hasil">
             <section class="panel panel--sukses">
@@ -68,6 +62,7 @@
                         <input v-model="form.tanggal" type="date" required class="isian" />
                     </label>
                 </div>
+
                 <label v-if="poTerpilih" class="isian-blok">
                     <span class="label">Catatan <em>opsional</em></span>
                     <input v-model="form.catatan" type="text" class="isian" />
@@ -76,7 +71,6 @@
 
             <section v-if="poTerpilih" class="panel">
                 <h2 class="panel__judul">Item</h2>
-
                 <div class="tabel-wrap">
                     <table class="tabel">
                         <thead>
@@ -113,6 +107,7 @@
                                 </td>
                                 <td class="ka">{{ deklarasi(r) != null ? angka(deklarasi(r), 3) : '—' }}</td>
                                 <td class="ka">
+                                    <!-- Qty diterima dibatasi ke sisa_qty -->
                                     <input v-model.number="r.qty_diterima" type="number" min="0" step="0.001"
                                         :max="r.sisa_qty" class="isian isian--angka" />
                                 </td>
@@ -131,20 +126,19 @@
                     </table>
                 </div>
 
+                <!-- Tampilan Card untuk HP -->
                 <div class="kartu-item-list">
                     <div v-for="r in baris" :key="'kartu-' + r.po_item_id" class="kartu-item">
                         <div class="kartu-item__judul">
                             <span class="tebal">{{ r.nama_item }}</span>
                             <span class="redup">Sisa PO: {{ angka(r.sisa_qty, 3) }}</span>
                         </div>
-
                         <label class="isian-blok">
                             <span class="label">Kemasan</span>
                             <select v-model="r.jenis_kemasan" class="isian">
                                 <option v-for="k in JENIS_KEMASAN" :key="k" :value="k">{{ k }}</option>
                             </select>
                         </label>
-
                         <div v-if="r.jenis_kemasan !== 'CURAH'" class="baris2">
                             <label class="isian-blok">
                                 <span class="label">Jumlah koli</span>
@@ -157,11 +151,9 @@
                                     class="isian isian--angka" required />
                             </label>
                         </div>
-
                         <p class="kartu-item__deklarasi">
                             Deklarasi: {{ deklarasi(r) != null ? angka(deklarasi(r), 3) : '—' }}
                         </p>
-
                         <div class="baris2">
                             <label class="isian-blok">
                                 <span class="label">Qty timbang</span>
@@ -174,7 +166,6 @@
                                     class="isian isian--angka" />
                             </label>
                         </div>
-
                         <p class="kartu-item__selisih" :class="{ 'teks-merah': melebihiToleransi(r) }">
                             <template v-if="selisih(r) != null">
                                 Selisih: {{ angka(selisih(r), 3) }} ({{ angka(persenSelisih(r), 2) }}%)
@@ -202,7 +193,8 @@
 
             <div v-if="poTerpilih" class="aksi">
                 <router-link to="/warehouse" class="tombol">Batal</router-link>
-                <button type="submit" class="tombol tombol--utama" :disabled="sedangProses || barisLewatSisa.length > 0">
+                <button type="submit" class="tombol tombol--utama"
+                    :disabled="sedangProses || barisLewatSisa.length > 0">
                     {{ sedangProses ? 'Menyimpan...' : 'Simpan Penerimaan' }}
                 </button>
             </div>
@@ -211,18 +203,27 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useGoodsReceipt } from '../composables/useGoodsReceipt'
+import { useNavInputEntry } from '../composables/useNavInputEntry'
 import { angka, hariIni } from '@/utils/format'
 
 const JENIS_KEMASAN = ['KARUNG', 'DRUM', 'JERIGEN', 'DUS', 'SAK', 'CURAH']
 
 const { daftarPOSiapTerima, sedangProses, muatPOSiapTerima, simpanPenerimaan } = useGoodsReceipt()
 
+// Ekstrak state dari layout
+const { setNavInfo, resetNav } = useNavInputEntry()
+
 const poIdTerpilih = ref('')
 const poTerpilih = computed(() => daftarPOSiapTerima.value.find(po => po.id === poIdTerpilih.value) ?? null)
 
-const form = reactive({ no_surat_jalan: '', tanggal: hariIni(), catatan: '' })
+const form = reactive({
+    no_surat_jalan: '',
+    tanggal: hariIni(),
+    catatan: ''
+})
+
 const baris = ref([])
 const pesanError = ref('')
 const hasil = ref(null)
@@ -245,27 +246,32 @@ const deklarasi = (r) => {
     if (r.jenis_kemasan === 'CURAH' || !r.jumlah_koli || !r.isi_per_koli) return null
     return r.jumlah_koli * r.isi_per_koli
 }
+
 const selisih = (r) => {
     const d = deklarasi(r)
     if (d == null || r.qty_diterima == null || r.qty_diterima === '') return null
     return Number(r.qty_diterima) - d
 }
+
 const persenSelisih = (r) => {
     const d = deklarasi(r)
     const s = selisih(r)
     return d && s != null ? (s / d) * 100 : null
 }
+
 const melebihiToleransi = (r) => {
     const p = persenSelisih(r)
     return p != null && Math.abs(p) > 0.5
 }
 
 const barisMelebihiToleransi = computed(() => baris.value.filter(melebihiToleransi))
+
 const barisLewatSisa = computed(() =>
     baris.value.filter(r => r.qty_diterima != null && Number(r.qty_diterima) > r.sisa_qty))
 
 const kirim = async () => {
     pesanError.value = ''
+
     const barisKirim = baris.value
         .filter(r => Number(r.qty_diterima) > 0)
         .map(r => ({
@@ -292,32 +298,26 @@ const kirim = async () => {
         baris: barisKirim,
     })
 
-    if (res.success) hasil.value = res.data
-    else pesanError.value = res.message
+    if (res.success) {
+        hasil.value = res.data
+    } else {
+        pesanError.value = res.message
+    }
 }
 
-onMounted(() => muatPOSiapTerima())
+onMounted(() => {
+    setNavInfo('Penerimaan Barang Baru', 'Warehouse > Penerimaan > Entry')
+    muatPOSiapTerima()
+})
+
+onUnmounted(() => {
+    resetNav()
+})
 </script>
 
 <style scoped>
 .halaman {
-    max-width: 72rem;
-    margin: 0 auto;
-}
-
-.remah {
-    margin: 0 0 1rem;
-    font-size: .75rem;
-    color: var(--redup-2);
-}
-
-.remah a {
-    color: var(--redup);
-    text-decoration: none;
-}
-
-.remah a:hover {
-    color: var(--teks);
+    width: 100%;
 }
 
 .judul {

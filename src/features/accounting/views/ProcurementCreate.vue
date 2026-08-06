@@ -17,13 +17,10 @@
 
             <!-- Tombol Aksi di Kanan Atas -->
             <div class="flex items-center gap-2">
-                <!-- Tombol Trigger Modal Tambah Produk -->
                 <button type="button" @click="showModalProduct = true"
                     class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-colors flex items-center gap-2 shadow-sm transform hover:-translate-y-0.5">
                     <i class="pi pi-plus"></i> Produk Baru
                 </button>
-
-                <!-- Tombol Trigger Modal Tambah Suplier -->
                 <button type="button" @click="showModalSupplier = true"
                     class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-colors flex items-center gap-2 shadow-sm transform hover:-translate-y-0.5">
                     <i class="pi pi-plus"></i> Suplier Baru
@@ -31,7 +28,7 @@
             </div>
         </div>
 
-        <!-- Notifikasi Error (Termasuk jika periode ditutup) -->
+        <!-- Notifikasi Error -->
         <div v-if="pesanError"
             class="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600 font-medium flex items-start gap-3">
             <i class="pi pi-exclamation-triangle mt-0.5"></i>
@@ -64,13 +61,11 @@
                     <input :value="previewNomor" type="text" readonly
                         class="px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl focus:outline-none text-sm text-slate-500 font-semibold cursor-not-allowed" />
                 </div>
-
                 <div class="flex flex-col gap-2">
                     <label class="text-xs md:text-sm font-bold text-slate-700">Tanggal PO</label>
                     <input v-model="draf.tanggal" type="date" required
                         class="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm text-slate-800" />
                 </div>
-
                 <div class="flex flex-col gap-2">
                     <label class="text-xs md:text-sm font-bold text-slate-700">Supplier Tujuan</label>
                     <select v-model.number="draf.suplier_id" required
@@ -127,8 +122,6 @@
                     <tbody class="block md:table-row-group">
                         <tr v-for="(item, index) in draf.items" :key="index"
                             class="block md:table-row bg-white border border-slate-200 md:border-b md:border-x-0 md:border-t-0 md:border-slate-100 rounded-2xl md:rounded-none mb-6 md:mb-0 p-4 md:p-0 shadow-sm md:shadow-none relative transition-colors">
-
-                            <!-- Kolom Produk dg Dropdown Katalog Suplier -->
                             <td class="block md:table-cell md:py-3 md:px-2 mb-3 md:mb-0">
                                 <label class="md:hidden text-xs font-bold text-slate-500 mb-1 block">Produk</label>
                                 <Dropdown v-model="item.produk" :options="produkBerdasarkanSuplier" optionLabel="label"
@@ -146,26 +139,14 @@
                                     <template #option="slotProps">
                                         <span class="text-sm text-slate-700">{{ slotProps.option.label }}</span>
                                     </template>
-                                    <template #empty>
-                                        <div class="flex flex-col items-center justify-center p-4 text-center">
-                                            <span class="text-sm text-slate-500 mb-3">Suplier ini belum memiliki produk
-                                                di katalog.</span>
-                                            <button type="button" @click="showModalProduct = true"
-                                                class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-2">
-                                                <i class="pi pi-plus text-[10px]"></i> Buat Produk Baru
-                                            </button>
-                                        </div>
-                                    </template>
                                 </Dropdown>
                             </td>
-
                             <td class="block md:table-cell md:py-3 md:px-2 mb-3 md:mb-0">
                                 <label class="md:hidden text-xs font-bold text-slate-500 mb-1 block">Qty (Kg)</label>
                                 <input v-model.number="item.qty" type="number" min="0" step="0.01" required
                                     class="w-full px-3 py-2.5 md:py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm md:text-right focus:ring-2 focus:ring-emerald-500 text-slate-800"
                                     placeholder="0" />
                             </td>
-
                             <td class="block md:table-cell md:py-3 md:px-2 mb-4 md:mb-0">
                                 <label class="md:hidden text-xs font-bold text-slate-500 mb-1 block">Harga per Kg
                                     (Rp)</label>
@@ -177,18 +158,15 @@
                                         placeholder="0" />
                                 </div>
                             </td>
-
                             <td
                                 class="flex justify-between items-center md:table-cell md:py-3 md:px-2 bg-slate-50 md:bg-transparent p-3 rounded-lg md:rounded-none mb-3 md:mb-0 font-black text-slate-800 md:text-right">
                                 <span class="md:hidden text-xs text-slate-500 uppercase">Subtotal</span>
                                 Rp {{ (subtotal(item)).toLocaleString('id-ID') }}
                             </td>
-
                             <td
                                 class="block md:table-cell md:py-3 md:px-2 text-center border-t border-slate-100 md:border-none mt-2 md:mt-0 pt-4 md:pt-0">
                                 <button type="button" @click="hapusItem(index)" :disabled="draf.items.length === 1"
-                                    class="w-full md:w-8 h-10 md:h-8 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-30 disabled:hover:bg-transparent transition-colors flex items-center justify-center gap-2 mx-auto"
-                                    title="Hapus Item">
+                                    class="w-full md:w-8 h-10 md:h-8 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-30 disabled:hover:bg-transparent transition-colors flex items-center justify-center gap-2 mx-auto">
                                     <i class="pi pi-times md:text-sm"></i>
                                     <span class="md:hidden font-bold text-sm text-red-500">Hapus Item</span>
                                 </button>
@@ -198,26 +176,45 @@
                 </table>
             </div>
 
-            <!-- Footer / Total -->
+            <!-- Footer / Total Kalkulasi PPN -->
             <div
-                class="flex flex-col md:flex-row justify-between items-center bg-slate-50 p-4 md:p-6 rounded-2xl border border-slate-100">
-                <div
-                    class="text-slate-500 text-[11px] md:text-sm mb-4 md:mb-0 flex items-center gap-2 text-center md:text-left">
-                    <i class="pi pi-info-circle text-slate-400"></i> Harga total belum termasuk nilai pajak terkait.
+                class="flex flex-col md:flex-row justify-between items-start bg-slate-50 p-4 md:p-6 rounded-2xl border border-slate-100">
+                <div class="flex flex-col gap-2 w-full md:w-auto mb-6 md:mb-0">
+                    <!-- Toggle PPN -->
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" id="pakaiPpn" :true-value="11" :false-value="0" v-model="draf.ppn_persen"
+                            class="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-600 cursor-pointer">
+                        <label for="pakaiPpn" class="text-sm font-bold text-slate-700 cursor-pointer select-none">
+                            Kenakan PPN 11% (Suplier PKP)
+                        </label>
+                    </div>
+                    <div class="text-slate-500 text-[11px] md:text-xs flex items-center gap-1.5">
+                        <i class="pi pi-info-circle"></i> Centang jika harga belum termasuk pajak.
+                    </div>
                 </div>
 
-                <div class="flex flex-col md:flex-row items-center gap-4 md:gap-6 w-full md:w-auto">
-                    <div class="text-center md:text-right w-full md:w-auto">
+                <!-- Ringkasan Angka -->
+                <div class="flex flex-col w-full md:w-64 gap-2 border-t md:border-none border-slate-200 pt-4 md:pt-0">
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="font-semibold text-slate-500">Subtotal</span>
+                        <span class="font-bold text-slate-700">Rp {{ (subtotalSemua).toLocaleString('id-ID') }}</span>
+                    </div>
+
+                    <div v-if="draf.ppn_persen > 0" class="flex justify-between items-center text-sm animate-fade-in">
+                        <span class="font-semibold text-emerald-600">PPN (11%)</span>
+                        <span class="font-bold text-emerald-700">Rp {{ (ppnNominal).toLocaleString('id-ID') }}</span>
+                    </div>
+
+                    <div class="flex justify-between items-end mt-2 pt-2 border-t border-slate-200">
                         <span
-                            class="block text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider">Grand
+                            class="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Grand
                             Total</span>
-                        <span class="block text-2xl md:text-3xl font-black text-slate-800">
-                            Rp {{ (subtotalSemua).toLocaleString('id-ID') }}
-                        </span>
+                        <span class="text-2xl font-black text-slate-800">Rp {{ (grandTotal).toLocaleString('id-ID')
+                        }}</span>
                     </div>
 
                     <button type="submit" :disabled="sedangProses || periodeDitutup"
-                        class="w-full md:w-auto justify-center px-6 md:px-8 py-3.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-400 text-white font-bold rounded-xl shadow-[0_4px_15px_rgba(16,185,129,0.3)] transition-all flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed">
+                        class="mt-4 w-full justify-center px-6 py-3.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-400 text-white font-bold rounded-xl shadow-[0_4px_15px_rgba(16,185,129,0.3)] transition-all flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed">
                         <i class="pi" :class="sedangProses ? 'pi-spin pi-spinner' : 'pi-check-circle'"></i>
                         {{ sedangProses ? 'Memproses...' : 'Terbitkan PO' }}
                     </button>
@@ -263,6 +260,7 @@ const draf = reactive({
     tanggal: hariIni(),
     tanggal_kirim_diminta: '',
     catatan: '',
+    ppn_persen: 0, // State default untuk PPN
     items: [itemKosong()],
 })
 
@@ -314,14 +312,25 @@ watch(() => draf.suplier_id, (newVal, oldVal) => {
 
 const produkBerdasarkanSuplier = computed(() => {
     if (!draf.suplier_id) return []
-
     return listProduk.value
-        .filter(p => p.suplier && p.suplier.includes(draf.suplier_id))
-        .map(p => ({ ...p, label: `${p.kode} — ${p.nama}` }))
+        .filter(p => {
+            if (!p.suplier || !Array.isArray(p.suplier)) return false;
+            return p.suplier.some(sup => {
+                if (sup !== null && typeof sup === 'object' && sup.id !== undefined) {
+                    return String(sup.id) === String(draf.suplier_id);
+                }
+                return String(sup) === String(draf.suplier_id);
+            });
+        })
+        .map(p => ({ ...p, label: `${p.kode} - ${p.nama}` }))
 })
 
+// === LOGIKA KALKULASI HARGA & PPN ===
 const subtotal = (item) => (Number(item.qty) || 0) * (Number(item.harga_per_kg) || 0)
 const subtotalSemua = computed(() => draf.items.reduce((s, i) => s + subtotal(i), 0))
+const ppnNominal = computed(() => subtotalSemua.value * (draf.ppn_persen / 100))
+const grandTotal = computed(() => subtotalSemua.value + ppnNominal.value)
+// ====================================
 
 const tambahItem = () => draf.items.push(itemKosong())
 const hapusItem = (i) => {
@@ -344,6 +353,7 @@ const kirim = async () => {
         tanggal: draf.tanggal,
         tanggal_kirim_diminta: draf.tanggal_kirim_diminta || null,
         catatan: draf.catatan,
+        ppn_persen: draf.ppn_persen || 0, // Kirim status PPN
         items: draf.items.map(i => ({
             produk_id: i.produk.id,
             qty_pesan: Number(i.qty) || 0,
@@ -355,7 +365,6 @@ const kirim = async () => {
     const hasil = await simpanPO(payload, true)
 
     if (hasil.success) {
-        alert('Purchase Order berhasil diterbitkan!')
         router.push('/accounting/input/po')
     }
 }

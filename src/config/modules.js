@@ -132,7 +132,7 @@ export const MODUL = [
     ringkas: 'Tugas dan penugasan antar staf',
     ikon: 'transaksi',
     rute: '/work-order',
-    siap: false,
+    siap: true,
     catatan: 'Endpoint backend belum ada',
     menu: [],
   },
@@ -167,13 +167,6 @@ export const modulDariBackend = (modulBackend = []) =>
     return {
       id: mb.kode,
       nama: lokal?.nama ?? mb.label ?? mb.kode,
-      // Perlakuan ikon dan rute SENGAJA berbeda, jangan diseragamkan:
-      // - ikon local-first tanpa fallback backend, karena backend mengirim
-      //   nama PrimeIcons ('pi-book') sedangkan BaseIcon memakai kunci SVG
-      //   sendiri ('buku') — nilai backend tidak akan pernah ter-render.
-      // - rute boleh jatuh ke milik backend: untuk modul yang belum ada di
-      //   katalog, rute backend jauh lebih berguna daripada '/' (yang
-      //   memutar kartu balik ke dashboard).
       ikon: lokal?.ikon || 'master',
       rute: lokal?.rute || mb.rute || '/',
       ringkas: lokal?.ringkas ?? '',

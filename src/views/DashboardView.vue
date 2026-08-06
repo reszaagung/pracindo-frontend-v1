@@ -27,6 +27,7 @@
             </div>
         </header>
 
+        <!-- BAGIAN ATAS: KARTU MODUL -->
         <section class="blok">
             <h2 class="stensil">Modul</h2>
             <div class="kartu">
@@ -37,6 +38,11 @@
                 Modul yang tidak muncul di sini di luar tanggung jawab
                 {{ (kartu?.role_display ?? 'staf').toLowerCase() }}.
             </p>
+        </section>
+
+        <!-- BAGIAN BAWAH: PAPAN TUGAS GLOBAL -->
+        <section class="blok w-full mt-10">
+            <WorkOrderPanel />
         </section>
     </div>
 </template>
@@ -49,18 +55,10 @@ import { useAuth } from '@/composables/useAuth'
 import { MODUL as MODUL_KATALOG, modulDariBackend } from '@/config/modules'
 import ModuleCard from '@/components/ModuleCard.vue'
 
+import WorkOrderPanel from '@/features/work-order/views/WorkOrderBoard.vue'
+
 const router = useRouter()
 const { kartu, modul, logout } = useAuth()
-
-// Filter KARTU TAMPILAN saja — otorisasi tetap milik backend (useAuth +
-// guard). Jangan pernah memutasi modul.value di sini.
-//   - sembunyiDiDashboard: 'dashboard' ikut dikirim backend ke hampir semua
-//     role, tapi kartu "buka dashboard" di halaman dashboard tidak berguna.
-//   - sembunyiDiDashboardUntuk: kartu yang tidak relevan untuk role tertentu.
-// Kartu turunan (punya indukModul) disisipkan tepat di bawah induknya, dan
-// HANYA kalau modul induknya benar-benar ada di daftar modul backend user.
-// Ini murni penambahan kartu: kode turunan tidak pernah dipakai guard —
-// rutenya memakai meta.modul milik induk.
 const modulSaya = computed(() => {
     const peran = kartu.value?.role || ''
     const tampil = (m) =>

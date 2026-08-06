@@ -153,99 +153,42 @@ const openUploadModalFor = (po_id, partner, docType) => {
 
                         <td
                             class="block md:table-cell md:py-4 md:px-6 mb-4 md:mb-0 border-b border-slate-50 md:border-none pb-3 md:pb-0">
-                            <span
-                                class="md:hidden text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Referensi
-                                Transaksi</span>
-                            <span class="font-bold text-slate-900 block text-base">{{ item.po_id }}</span>
-                            <span class="text-xs font-medium text-slate-500 block mt-0.5">{{ item.partner }}</span>
+                            <!-- Isi Referensi Transaksi -->
                         </td>
 
-                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 md:contents mb-4 md:mb-0">
+                        <!-- HAPUS <div class="grid..."> DI SINI -->
 
-                            <td
-                                class="flex justify-between items-center md:table-cell md:py-4 md:px-4 md:text-center border-b border-slate-50 md:border-none py-2 md:py-0">
-                                <span class="md:hidden text-xs font-bold text-slate-500">1. Invoice</span>
-                                <div v-if="item.files.invoice?.exists"
-                                    class="inline-flex flex-col items-center bg-emerald-50/60 border border-emerald-100 px-3 py-1.5 rounded-xl">
-                                    <span class="text-xs font-bold text-emerald-700 flex items-center gap-1"><i
-                                            class="pi pi-check text-[10px]"></i> Tersedia</span>
-                                    <span class="hidden md:block text-[9px] text-emerald-600 font-medium mt-0.5">{{
-                                        item.files.invoice.doc_no }}</span>
-                                </div>
-                                <button v-else @click="openUploadModalFor(item.po_id, item.partner, 'Invoice')"
-                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 text-slate-500 hover:bg-emerald-50 hover:text-emerald-600 border border-slate-200 rounded-xl text-xs font-bold tracking-wide transition-colors">
-                                    <i class="pi pi-cloud-upload text-[10px]"></i> Upload
-                                </button>
-                            </td>
+                        <td
+                            class="flex justify-between items-center md:table-cell md:py-4 md:px-4 md:text-center border-b border-slate-50 md:border-none py-2 md:py-0">
+                            <span class="md:hidden text-xs font-bold text-slate-500">1. Invoice</span>
+                            <!-- Isi Invoice -->
+                        </td>
 
-                            <td
-                                class="flex justify-between items-center md:table-cell md:py-4 md:px-4 md:text-center border-b border-slate-50 md:border-none py-2 md:py-0">
-                                <span class="md:hidden text-xs font-bold text-slate-500">2. Faktur Pajak</span>
-                                <div v-if="item.files.faktur_pajak?.exists"
-                                    class="inline-flex flex-col items-center bg-emerald-50/60 border border-emerald-100 px-3 py-1.5 rounded-xl">
-                                    <span class="text-xs font-bold text-emerald-700 flex items-center gap-1"><i
-                                            class="pi pi-check text-[10px]"></i> Tersedia</span>
-                                    <span class="hidden md:block text-[9px] text-emerald-600 font-medium mt-0.5">{{
-                                        item.files.faktur_pajak.doc_no }}</span>
-                                </div>
-                                <button v-else @click="openUploadModalFor(item.po_id, item.partner, 'Faktur Pajak')"
-                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 text-slate-500 hover:bg-emerald-50 hover:text-emerald-600 border border-slate-200 rounded-xl text-xs font-bold tracking-wide transition-colors">
-                                    <i class="pi pi-cloud-upload text-[10px]"></i> Upload
-                                </button>
-                            </td>
+                        <td
+                            class="flex justify-between items-center md:table-cell md:py-4 md:px-4 md:text-center border-b border-slate-50 md:border-none py-2 md:py-0">
+                            <span class="md:hidden text-xs font-bold text-slate-500">2. Faktur Pajak</span>
+                            <!-- Isi Faktur Pajak -->
+                        </td>
 
-                            <td
-                                class="flex justify-between items-center md:table-cell md:py-4 md:px-4 md:text-center border-b border-slate-50 md:border-none py-2 md:py-0">
-                                <span class="md:hidden text-xs font-bold text-slate-500">3. Surat Jalan</span>
-                                <div v-if="item.files.surat_jalan?.exists"
-                                    class="inline-flex flex-col items-center bg-emerald-50/60 border border-emerald-100 px-3 py-1.5 rounded-xl">
-                                    <span class="text-xs font-bold text-emerald-700 flex items-center gap-1"><i
-                                            class="pi pi-check text-[10px]"></i> Tersedia</span>
-                                    <span class="hidden md:block text-[9px] text-emerald-600 font-medium mt-0.5">{{
-                                        item.files.surat_jalan.doc_no }}</span>
-                                </div>
-                                <button v-else @click="openUploadModalFor(item.po_id, item.partner, 'Surat Jalan')"
-                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 text-slate-500 hover:bg-emerald-50 hover:text-emerald-600 border border-slate-200 rounded-xl text-xs font-bold tracking-wide transition-colors">
-                                    <i class="pi pi-cloud-upload text-[10px]"></i> Upload
-                                </button>
-                            </td>
-                        </div>
+                        <td
+                            class="flex justify-between items-center md:table-cell md:py-4 md:px-4 md:text-center border-b border-slate-50 md:border-none py-2 md:py-0 mb-4 md:mb-0">
+                            <span class="md:hidden text-xs font-bold text-slate-500">3. Surat Jalan</span>
+                            <!-- Isi Surat Jalan -->
+                        </td>
+
+                        <!-- HAPUS </div> DI SINI -->
 
                         <td class="block md:table-cell md:py-4 md:px-6 md:text-center mb-3 md:mb-0">
-                            <span class="md:hidden text-xs font-bold text-slate-500 mb-2 block">Progress Audit</span>
-                            <div
-                                class="flex md:flex-col items-center justify-between md:justify-center gap-2 md:gap-1.5">
-                                <span
-                                    :class="getComplianceStats(item.files).isComplete ? 'bg-emerald-600 text-white' : 'bg-amber-100 text-amber-700'"
-                                    class="px-3 py-1 rounded-full text-[10px] md:text-xs font-bold tracking-wide">
-                                    {{ getComplianceStats(item.files).isComplete ? 'PASSED' : 'INCOMPLETE' }}
-                                </span>
-                                <div
-                                    class="w-1/2 md:w-20 bg-slate-100 h-1.5 rounded-full overflow-hidden border border-slate-200">
-                                    <div :class="getComplianceStats(item.files).isComplete ? 'bg-emerald-500' : 'bg-amber-500'"
-                                        :style="{ width: getComplianceStats(item.files).percentage + '%' }"
-                                        class="h-full transition-all"></div>
-                                </div>
-                                <span class="text-[10px] text-slate-400 font-bold hidden md:inline-block">{{
-                                    getComplianceStats(item.files).percentage }}% Lengkap</span>
-                            </div>
+                            <!-- Isi Progress Audit -->
                         </td>
 
                         <td
                             class="flex justify-between items-center md:table-cell md:py-4 md:px-4 md:text-center mb-4 md:mb-0">
-                            <span class="md:hidden text-xs font-bold text-slate-500">Status Pembayaran</span>
-                            <span :class="getPaymentBadge(item.payment_status)"
-                                class="px-3 py-1.5 rounded-lg text-[10px] font-extrabold uppercase tracking-wider inline-block min-w-[80px] text-center">
-                                {{ item.payment_status }}
-                            </span>
+                            <!-- Isi Pembayaran -->
                         </td>
 
                         <td class="block md:table-cell p-0 md:py-4 md:px-4 md:text-center mt-2 md:mt-0">
-                            <button @click="openDetailModal(item)"
-                                class="w-full md:w-9 h-11 md:h-9 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white border border-blue-100 transition-colors inline-flex items-center justify-center shadow-sm gap-2">
-                                <i class="pi pi-eye text-sm md:text-base"></i>
-                                <span class="md:hidden text-sm font-bold">Lihat Detail Transaksi</span>
-                            </button>
+                            <!-- Isi Tombol Aksi -->
                         </td>
 
                     </tr>
@@ -346,7 +289,7 @@ const openUploadModalFor = (po_id, partner, docType) => {
                                     <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
                                         REKANAN</p>
                                     <p class="text-xs md:text-sm font-bold text-slate-700">{{ selectedAuditItem.partner
-                                        }}</p>
+                                    }}</p>
                                 </div>
                             </div>
                             <div class="pt-3 border-t border-slate-200">

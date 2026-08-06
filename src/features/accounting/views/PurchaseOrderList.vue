@@ -6,14 +6,12 @@
                 <p class="text-xs text-slate-400 mb-1">
                     <router-link to="/accounting" class="hover:text-slate-700 transition-colors">Portal
                         Akunting</router-link> ›
-                    <!-- PERBAIKAN RUTE: Mengarah ke /input/ -->
                     <router-link to="/accounting/input/po"
                         class="hover:text-slate-700 transition-colors">Pembelian</router-link>
                 </p>
                 <h2 class="text-xl md:text-2xl font-bold text-slate-800 tracking-tight">Purchase Order</h2>
             </div>
 
-            <!-- PERBAIKAN RUTE: Mengarah ke /input/po/buat -->
             <router-link to="/accounting/input/po/buat"
                 class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-colors flex items-center gap-2 shadow-sm transform hover:-translate-y-0.5">
                 <i class="pi pi-plus"></i> Buat PO Baru
@@ -60,10 +58,11 @@
                             class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-slate-900 text-slate-700" />
                     </div>
 
-                    <!-- Tab Status -->
+                    <!-- Tab Status (Sudah Ditambahkan DISETUJUI & DITOLAK) -->
                     <div class="flex bg-slate-50 p-1 rounded-xl w-full md:w-auto overflow-x-auto custom-scrollbar">
-                        <button v-for="tab in ['semua', 'DRAFT', 'TERKIRIM', 'SEBAGIAN', 'SELESAI', 'BATAL']" :key="tab"
-                            @click="saringStatus = tab.toLowerCase()"
+                        <button
+                            v-for="tab in ['semua', 'DRAFT', 'TERKIRIM', 'DISETUJUI', 'DITOLAK', 'SEBAGIAN', 'SELESAI', 'BATAL']"
+                            :key="tab" @click="saringStatus = tab.toLowerCase()"
                             :class="saringStatus === tab.toLowerCase() ? 'bg-white text-slate-800 shadow-[0_2px_8px_rgba(0,0,0,0.04)] font-bold' : 'text-slate-500 hover:text-slate-700'"
                             class="px-3 py-1.5 text-xs rounded-lg transition-all whitespace-nowrap capitalize">
                             {{ tab.toLowerCase() }}
@@ -101,7 +100,9 @@
                     </thead>
                     <tbody>
                         <tr v-for="po in tampil" :key="po.id"
-                            class="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
+                            class="border-b border-slate-100 hover:bg-slate-50/50 transition-colors cursor-pointer"
+                            @click="$router.push(`/accounting/input/po/${po.id}`)">
+                            <!-- Tambahan interaksi klik baris -->
                             <td class="py-3 px-4 font-bold text-slate-800">{{ po.no_po || po.nomor }}</td>
                             <td class="py-3 px-4 text-slate-600">{{ po.tanggal }}</td>
                             <td class="py-3 px-4 text-slate-700 truncate" :title="po.suplier_nama">{{ po.suplier_nama }}
@@ -124,9 +125,10 @@
 
 <script setup>
 import { onMounted } from 'vue'
-// Pastikan path ini menunjuk ke composable yang benar
+import { useRouter } from 'vue-router'
 import { usePurchaseOrder } from '@/features/accounting/composables/usePurchaseOrder'
 
+const router = useRouter()
 const {
     daftarPO, isLoadingDaftar, cari, saringStatus, tampil,
     belumDiterima, draftCount, totalBulanIni, muatDaftarPO
@@ -140,9 +142,11 @@ const badgeColor = (status) => {
     const st = String(status).toUpperCase()
     if (st === 'DRAFT') return 'bg-slate-100 text-slate-600'
     if (st === 'TERKIRIM') return 'bg-blue-50 text-blue-600'
+    if (st === 'DISETUJUI') return 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+    if (st === 'DITOLAK') return 'bg-red-50 text-red-600'
     if (st === 'SEBAGIAN') return 'bg-amber-50 text-amber-600'
     if (st === 'SELESAI') return 'bg-emerald-50 text-emerald-600'
-    if (st === 'BATAL') return 'bg-red-50 text-red-600'
+    if (st === 'BATAL') return 'bg-red-100 text-red-700'
     return 'bg-slate-100 text-slate-600'
 }
 </script>

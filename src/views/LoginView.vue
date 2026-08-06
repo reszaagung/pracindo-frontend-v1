@@ -143,9 +143,6 @@ const handleLogin = async () => {
         form.password = ''
         return
     }
-
-    // login() sudah memanggil simpan(), jadi bisaAkses() dan modul sudah
-    // memuat data yang baru saat baris-baris di bawah ini berjalan.
     const tujuan = route.query.next
     if (bolehKe(tujuan)) {
         router.push(tujuan)
@@ -155,16 +152,6 @@ const handleLogin = async () => {
     router.push(rutePertamaSiap(modul.value) ?? { name: 'dashboard' })
 }
 
-/**
- * Apakah `next` layak diikuti?
- *
- * Guard mengirim `next` apa adanya dari URL, jadi isinya belum tepercaya:
- *   - harus path internal — '//situs-lain.com' adalah open redirect,
- *     dan `startsWith('/')` saja tidak menangkapnya
- *   - harus benar-benar ada rutenya, bukan jatuh ke catch-all 404
- *   - modulnya harus lolos bisaAkses, kalau tidak pengguna login lalu
- *     langsung dilempar guard ke halaman Akses Ditolak
- */
 const bolehKe = (tujuan) => {
     if (typeof tujuan !== 'string' || !tujuan.startsWith('/')) return false
     if (tujuan === '/' || tujuan.startsWith('//')) return false

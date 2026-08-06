@@ -30,10 +30,6 @@ export const useGuards = (router) => {
     }
 
     if (to.meta?.modul && !auth.bisaAkses(to.meta.modul)) {
-      // Dialihkan ke halaman, bukan kotak peringatan browser lalu
-      // `return false`. `return false` membatalkan navigasi tanpa jejak:
-      // pengguna mengklik sesuatu dan tidak terjadi apa-apa, tanpa
-      // penjelasan apa pun.
       return { name: 'akses-ditolak', query: { modul: to.meta.modul } }
     }
 

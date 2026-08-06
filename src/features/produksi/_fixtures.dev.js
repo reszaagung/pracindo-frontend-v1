@@ -29,10 +29,6 @@ const halaman = (results) => ({
   results,
 })
 
-// =========================================================
-// DATA ACUAN
-// =========================================================
-
 const GRUP_BAHAN = [
   { id: 1, kode: 'PT', nama: 'Pool PT sendiri' },
   { id: 2, kode: 'BERSAMA', nama: 'Pool bersama (CV + Agus + Marsini)' },

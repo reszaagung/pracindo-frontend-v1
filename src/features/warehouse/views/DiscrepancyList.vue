@@ -19,8 +19,8 @@
         </header>
 
         <div class="saring">
-            <button v-for="opt in SARINGAN" :key="opt.nilai" class="chip" :class="{ 'chip--aktif': saring === opt.nilai }"
-                @click="saring = opt.nilai">
+            <button v-for="opt in SARINGAN" :key="opt.nilai" class="chip"
+                :class="{ 'chip--aktif': saring === opt.nilai }" @click="saring = opt.nilai">
                 {{ opt.label }}
             </button>
         </div>
@@ -45,8 +45,8 @@
                         <td class="ka">{{ angka(s.qty_selisih, 3) }}</td>
                         <td><span class="lencana" :class="kelasStatus(s.status)">{{ s.status }}</span></td>
                         <td class="ka">
-                            <button v-if="s.status === 'DIBUKA'" class="tombol tombol--kecil"
-                                :disabled="sedangProses" @click="ajukanKlaim(s)">
+                            <button v-if="s.status === 'DIBUKA'" class="tombol tombol--kecil" :disabled="sedangProses"
+                                @click="ajukanKlaim(s)">
                                 Ajukan
                             </button>
                         </td>

@@ -12,17 +12,17 @@ export function useNavTransaksi() {
             activate: true
         },
         {
+            id: 'pengeluaran',
+            label: 'Pengeluaran',
+            ikon: 'pi-wallet',
+            rute: '/accounting/input/pengeluaran/buat',
+            activate: true
+        },
+        {
             id: 'pembelian',
             label: 'Pembelian Langsung',
             ikon: 'pi-shop',
             rute: '/accounting/input/pembelian',
-            activate: false
-        },
-        {
-            id: 'pembayaran',
-            label: 'Pembayaran',
-            ikon: 'pi-wallet',
-            rute: '/accounting/input/pembayaran',
             activate: false
         }
     ]

@@ -1,7 +1,7 @@
 import { ref, computed } from 'vue'
 import api from '@/utils/api'
 import { bacaError } from '@/utils/error'
-
+import { generateKode } from '@/utils/generate_id'
 export function usePurchaseOrder() {
 
     const daftarPO = ref([])
@@ -59,7 +59,6 @@ export function usePurchaseOrder() {
             })
             .reduce((s, po) => s + Number(po.total_nilai ?? 0), 0)
     })
-
     const muatDataMaster = async () => {
         sedangProses.value = true
         pesanError.value = ''
@@ -73,6 +72,8 @@ export function usePurchaseOrder() {
             listEntitas.value = resPortal.data.entitas || []
             listSupplier.value = resSupplier.data.results || resSupplier.data || []
             listProduk.value = resProduk.data.results || resProduk.data || []
+            console.log("Cek Data Produk dari Backend:", listProduk.value)
+
         } catch (err) {
             pesanError.value = bacaError(err, 'Gagal memuat data master (Entitas/Suplier/Produk).')
         } finally {
@@ -142,7 +143,6 @@ export function usePurchaseOrder() {
             throw new Error('Nama produk wajib diisi.')
         }
 
-        // Pastikan master satuan sudah dimuat
         if (!listSatuan.value.length) {
             const { data } = await api.get('master/satuan/', {
                 params: { aktif: true }
@@ -159,7 +159,6 @@ export function usePurchaseOrder() {
             throw new Error('Belum ada data satuan pada master.')
         }
 
-        // Cek apakah produk sudah ada di list yang sudah dimuat
         const produkLokal = listProduk.value.find(
             p => p.nama.trim().toLowerCase() === namaProduk.toLowerCase()
         )
@@ -167,16 +166,7 @@ export function usePurchaseOrder() {
         if (produkLokal) {
             return produkLokal
         }
-
-        // Kode sementara (backend idealnya yang generate)
-        const kode =
-            `${namaProduk}`
-                .toUpperCase()
-                .replace(/[^A-Z0-9]+/g, '-')
-                .replace(/^-|-$/g, '')
-                .slice(0, 16) +
-            '-' +
-            Math.random().toString(36).substring(2, 6).toUpperCase()
+        const kode = generateKode('RM')
 
         try {
             const { data } = await api.post('master/produk/', {
